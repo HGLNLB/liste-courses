@@ -25,12 +25,13 @@ export function CategoryEditor({
       <input
         autoFocus
         type="text"
-        name="category-name"
+        name="shopping-category-title"
         autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="words"
-        spellCheck={false}
+        autoCorrect="on"
+        autoCapitalize="sentences"
+        spellCheck
         inputMode="text"
+        enterKeyHint="done"
         data-1p-ignore
         data-lpignore="true"
         value={name}

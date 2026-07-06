@@ -263,6 +263,15 @@ export function CategoryCard({
     <input
       ref={titleInputRef}
       type="text"
+      name="shopping-category-title"
+      autoComplete="off"
+      autoCorrect="on"
+      autoCapitalize="sentences"
+      spellCheck
+      inputMode="text"
+      enterKeyHint="done"
+      data-1p-ignore
+      data-lpignore="true"
       value={editName}
       onChange={(event) => setEditName(event.target.value)}
       onKeyDown={(event) => {
@@ -272,7 +281,7 @@ export function CategoryCard({
       }}
       onClick={(event) => event.stopPropagation()}
       className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-[#1C1C1E] outline-none ring-0"
-      aria-label="Nom de la catégorie"
+      aria-label="Modifier la catégorie"
     />
   ) : (
     <button
