@@ -28,6 +28,10 @@ type CategoryCardProps = {
   wiggleCategories: boolean;
   wiggleItems: boolean;
   highlightedItemId: string | null;
+  itemFilter?: "all" | "unchecked" | "checked";
+  sectionType?: "toBuy" | "notNeeded";
+  showAddItem?: boolean;
+  dimmed?: boolean;
   onToggleOpen: () => void;
   onEditCategory: () => void;
   onDeleteCategory: () => void;
@@ -50,6 +54,10 @@ export function CategoryCard({
   wiggleCategories,
   wiggleItems,
   highlightedItemId,
+  itemFilter = "all",
+  sectionType,
+  showAddItem = true,
+  dimmed = false,
   onToggleOpen,
   onEditCategory,
   onDeleteCategory,
@@ -70,23 +78,51 @@ export function CategoryCard({
     useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
   );
 
+  const categoryEditActive = editMode === "categories";
+  const itemEditActive = editMode === "items";
+
+  const visibleItems = category.items.filter((item) => {
+    if (itemFilter === "unchecked") return !item.is_checked;
+    if (itemFilter === "checked") return item.is_checked;
+    return true;
+  });
+
   const handleItemDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const ids = category.items.map((item) => item.id);
-    const oldIndex = ids.indexOf(String(active.id));
-    const newIndex = ids.indexOf(String(over.id));
+    const visibleIds = visibleItems.map((item) => item.id);
+    const oldIndex = visibleIds.indexOf(String(active.id));
+    const newIndex = visibleIds.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const next = [...ids];
-    const [moved] = next.splice(oldIndex, 1);
-    next.splice(newIndex, 0, moved);
-    onReorderItems(next);
+    const nextVisible = [...visibleIds];
+    const [moved] = nextVisible.splice(oldIndex, 1);
+    nextVisible.splice(newIndex, 0, moved);
+
+    const visibleSet = new Set(nextVisible);
+    const hiddenItems = category.items.filter((item) => !visibleSet.has(item.id));
+    const reorderedVisible = nextVisible
+      .map((id) => category.items.find((item) => item.id === id))
+      .filter(Boolean) as typeof category.items;
+    const merged = [...reorderedVisible, ...hiddenItems];
+    onReorderItems(merged.map((item) => item.id));
   };
 
-  const categoryEditActive = editMode === "categories";
-  const itemEditActive = editMode === "items";
+  const categoryChecked =
+    sectionType === "toBuy" ? false : sectionType === "notNeeded" ? true : category.is_checked;
+
+  const handleCategoryChecked = (checked: boolean) => {
+    if (sectionType === "toBuy") {
+      onToggleCategoryChecked(true);
+      return;
+    }
+    if (sectionType === "notNeeded") {
+      onToggleCategoryChecked(false);
+      return;
+    }
+    onToggleCategoryChecked(checked);
+  };
 
   const categoryLongPress = useLongPress({
     onLongPress: () => {
@@ -101,7 +137,7 @@ export function CategoryCard({
     <section
       className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E5EA]/80 ${
         wiggleCategories && categoryEditActive ? "animate-wiggle" : ""
-      }`}
+      } ${dimmed ? "opacity-70" : ""}`}
       style={{ borderLeft: `4px solid ${category.color}` }}
     >
       <div className="flex items-center gap-2 px-3 py-3">
@@ -145,8 +181,8 @@ export function CategoryCard({
 
         {editMode === "none" && (
           <Checkbox
-            checked={category.is_checked}
-            onChange={onToggleCategoryChecked}
+            checked={categoryChecked}
+            onChange={handleCategoryChecked}
             ariaLabel={`Cocher la catégorie ${category.name}`}
           />
         )}
@@ -161,10 +197,10 @@ export function CategoryCard({
             onDragEnd={handleItemDragEnd}
           >
             <SortableContext
-              items={category.items.map((item) => item.id)}
+              items={visibleItems.map((item) => item.id)}
               strategy={verticalListSortingStrategy}
             >
-              {category.items.map((item) =>
+              {visibleItems.map((item) =>
                 editingItemId === item.id ? (
                   <div key={item.id} className="px-3 py-2">
                     <ItemEditor
@@ -194,7 +230,7 @@ export function CategoryCard({
             </SortableContext>
           </DndContext>
 
-          {!itemEditActive && !categoryEditActive && (
+          {!itemEditActive && !categoryEditActive && showAddItem && (
             <div className="px-3 py-2">
               {addingItem ? (
                 <ItemEditor

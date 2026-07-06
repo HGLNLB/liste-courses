@@ -31,6 +31,17 @@ export function vibrate(pattern: number | number[] = 40): void {
   }
 }
 
+export function getToBuyCategories(categories: CategoryWithItems[]) {
+  return categories.filter(
+    (category) =>
+      category.items.length === 0 || category.items.some((item) => !item.is_checked),
+  );
+}
+
+export function getNotNeededCategories(categories: CategoryWithItems[]) {
+  return categories.filter((category) => category.items.some((item) => item.is_checked));
+}
+
 export function getUncheckedGroups(categories: CategoryWithItems[]) {
   return categories
     .map((category) => ({

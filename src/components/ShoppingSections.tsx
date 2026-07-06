@@ -1,85 +1,216 @@
 "use client";
 
-import { formatItemLabel, getCheckedGroups, getUncheckedGroups } from "@/lib/utils";
-import type { CategoryWithItems } from "@/lib/types";
+import {
+  DndContext,
+  closestCenter,
+  type DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { SortableCategoryCard } from "./SortableCategoryCard";
+import { CategoryCard } from "./CategoryCard";
+import { CategoryEditor } from "./CategoryEditor";
+import { getNotNeededCategories, getToBuyCategories } from "@/lib/utils";
+import type { CategoryWithItems, EditMode } from "@/lib/types";
+import { CATEGORY_COLORS } from "@/lib/types";
 
 type ShoppingSectionsProps = {
   categories: CategoryWithItems[];
-  onItemClick: (itemId: string) => void;
+  editMode: EditMode;
+  wiggleCategories: boolean;
+  wiggleItems: boolean;
+  highlightedItemId: string | null;
+  creatingCategory: boolean;
+  editingCategoryId: string | null;
+  onCreateCategory: () => void;
+  onCancelCreateCategory: () => void;
+  onSaveCategory: (name: string, color: string) => void;
+  onCancelEditCategory: () => void;
+  onSaveEditCategory: (name: string, color: string) => void;
+  onCategoryDragEnd: (event: DragEndEvent) => void;
+  onToggleOpen: (id: string) => void;
+  onEditCategory: (id: string) => void;
+  onDeleteCategory: (id: string) => void;
+  onLongPressCategory: () => void;
+  onToggleCategoryChecked: (id: string, checked: boolean) => void;
+  onAddItem: (
+    categoryId: string,
+    payload: { name: string; quantity?: string; unit?: string; notes?: string },
+  ) => void;
+  onUpdateItem: (
+    id: string,
+    payload: { name: string; quantity?: string; unit?: string; notes?: string },
+  ) => void;
+  onDeleteItem: (id: string) => void;
+  onToggleItemChecked: (id: string, checked: boolean) => void;
+  onLongPressItem: () => void;
+  onReorderItems: (categoryId: string, orderedIds: string[]) => void;
 };
 
-export function ShoppingSections({ categories, onItemClick }: ShoppingSectionsProps) {
-  const toBuy = getUncheckedGroups(categories);
-  const notNeeded = getCheckedGroups(categories);
+export function ShoppingSections({
+  categories,
+  editMode,
+  wiggleCategories,
+  wiggleItems,
+  highlightedItemId,
+  creatingCategory,
+  editingCategoryId,
+  onCreateCategory,
+  onCancelCreateCategory,
+  onSaveCategory,
+  onCancelEditCategory,
+  onSaveEditCategory,
+  onCategoryDragEnd,
+  onToggleOpen,
+  onEditCategory,
+  onDeleteCategory,
+  onLongPressCategory,
+  onToggleCategoryChecked,
+  onAddItem,
+  onUpdateItem,
+  onDeleteItem,
+  onToggleItemChecked,
+  onLongPressItem,
+  onReorderItems,
+}: ShoppingSectionsProps) {
+  const toBuyCategories = getToBuyCategories(categories);
+  const notNeededCategories = getNotNeededCategories(categories);
+
+  const categorySensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+  );
+
+  const renderCategoryCard = (
+    category: CategoryWithItems,
+    options: {
+      itemFilter: "unchecked" | "checked";
+      sectionType: "toBuy" | "notNeeded";
+      showAddItem: boolean;
+      dimmed: boolean;
+      sortable: boolean;
+    },
+  ) => {
+    const props = {
+      category,
+      editMode,
+      wiggleCategories,
+      wiggleItems,
+      highlightedItemId,
+      itemFilter: options.itemFilter,
+      sectionType: options.sectionType,
+      showAddItem: options.showAddItem,
+      dimmed: options.dimmed,
+      onToggleOpen: () => onToggleOpen(category.id),
+      onEditCategory: () => onEditCategory(category.id),
+      onDeleteCategory: () => onDeleteCategory(category.id),
+      onLongPressCategory,
+      onToggleCategoryChecked: (checked: boolean) => onToggleCategoryChecked(category.id, checked),
+      onAddItem: (payload: { name: string; quantity?: string; unit?: string; notes?: string }) =>
+        onAddItem(category.id, payload),
+      onUpdateItem,
+      onDeleteItem,
+      onToggleItemChecked,
+      onLongPressItem,
+      onReorderItems: (orderedIds: string[]) => onReorderItems(category.id, orderedIds),
+    };
+
+    if (options.sortable) {
+      return <SortableCategoryCard key={category.id} {...props} />;
+    }
+
+    return <CategoryCard key={`${category.id}-${options.sectionType}`} {...props} />;
+  };
 
   return (
-    <div className="space-y-4 px-4 pb-8">
-      <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E5EA]/80">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#FF9500]">
-          À acheter
-        </h3>
-        {toBuy.length === 0 ? (
-          <p className="text-sm text-[#8E8E93]">Tout est coché — rien à acheter.</p>
+    <div className="space-y-6 px-4 pb-8">
+      {creatingCategory && (
+        <CategoryEditor onCancel={onCancelCreateCategory} onSave={onSaveCategory} />
+      )}
+
+      {editingCategoryId && (
+        <CategoryEditor
+          initialName={categories.find((c) => c.id === editingCategoryId)?.name}
+          initialColor={
+            categories.find((c) => c.id === editingCategoryId)?.color ?? CATEGORY_COLORS[0].value
+          }
+          onCancel={onCancelEditCategory}
+          onSave={onSaveEditCategory}
+        />
+      )}
+
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[#FF9500]">
+            À acheter
+          </h2>
+          {editMode === "none" && (
+            <button
+              type="button"
+              onClick={onCreateCategory}
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-[#007AFF] text-xl font-light text-white shadow-sm"
+              aria-label="Ajouter une catégorie"
+            >
+              +
+            </button>
+          )}
+        </div>
+
+        {toBuyCategories.length === 0 ? (
+          <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#8E8E93] shadow-sm ring-1 ring-[#E5E5EA]/80">
+            Tout est coché — rien à acheter.
+          </p>
         ) : (
-          <div className="space-y-4">
-            {toBuy.map(({ category, items }) => (
-              <div key={category.id}>
-                <p
-                  className="mb-1 text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: category.color }}
-                >
-                  {category.name}
-                </p>
-                <ul className="space-y-1">
-                  {items.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onItemClick(item.id)}
-                        className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-[#1C1C1E] hover:bg-[#F2F2F7]"
-                      >
-                        {formatItemLabel(item)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+          <DndContext
+            sensors={categorySensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={onCategoryDragEnd}
+          >
+            <SortableContext
+              items={toBuyCategories.map((category) => category.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                {toBuyCategories.map((category) =>
+                  renderCategoryCard(category, {
+                    itemFilter: "unchecked",
+                    sectionType: "toBuy",
+                    showAddItem: true,
+                    dimmed: false,
+                    sortable: true,
+                  }),
+                )}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
       </section>
 
-      <section className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-[#E5E5EA]/80">
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#8E8E93]">
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-[#8E8E93]">
           Pas besoin
-        </h3>
-        {notNeeded.length === 0 ? (
-          <p className="text-sm text-[#8E8E93]">Aucun élément coché pour l&apos;instant.</p>
+        </h2>
+
+        {notNeededCategories.length === 0 ? (
+          <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#8E8E93] shadow-sm ring-1 ring-[#E5E5EA]/80">
+            Aucun élément coché pour l&apos;instant.
+          </p>
         ) : (
-          <div className="space-y-4 opacity-60">
-            {notNeeded.map(({ category, items }) => (
-              <div key={category.id}>
-                <p
-                  className="mb-1 text-xs font-semibold uppercase tracking-wide"
-                  style={{ color: category.color }}
-                >
-                  {category.name}
-                </p>
-                <ul className="space-y-1">
-                  {items.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        type="button"
-                        onClick={() => onItemClick(item.id)}
-                        className="w-full rounded-lg px-2 py-1.5 text-left text-sm text-[#636366] line-through hover:bg-[#F2F2F7]"
-                      >
-                        {formatItemLabel(item)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+          <div className="space-y-3">
+            {notNeededCategories.map((category) =>
+              renderCategoryCard(category, {
+                itemFilter: "checked",
+                sectionType: "notNeeded",
+                showAddItem: false,
+                dimmed: true,
+                sortable: false,
+              }),
+            )}
           </div>
         )}
       </section>

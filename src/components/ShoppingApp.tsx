@@ -1,26 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  DndContext,
-  closestCenter,
-  type DragEndEvent,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { type DragEndEvent } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
-import { SortableCategoryCard } from "./SortableCategoryCard";
 import { CategoryEditor } from "./CategoryEditor";
 import { SearchOverlay } from "./SearchOverlay";
 import { ShoppingSections } from "./ShoppingSections";
 import { vibrate } from "@/lib/utils";
 import type { EditMode } from "@/lib/types";
-import { CATEGORY_COLORS } from "@/lib/types";
 
 type ShoppingAppProps = {
   userId: string;
@@ -55,11 +43,6 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
-
-  const categorySensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
-  );
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -191,96 +174,70 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
         </div>
       )}
 
-      <main className="space-y-6 py-4">
-        <section className="px-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-[#8E8E93]">
-              Catégories
-            </h2>
-            {editMode === "none" && (
+      <main className="py-4">
+        {categories.length === 0 && !creatingCategory ? (
+          <div className="space-y-4 px-4">
+            <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#8E8E93] shadow-sm ring-1 ring-[#E5E5EA]/80">
+              Appuyez sur + pour créer votre première catégorie.
+            </p>
+            <div className="flex justify-end">
               <button
                 type="button"
                 onClick={() => setCreatingCategory(true)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-[#007AFF] text-xl font-light text-white shadow-sm"
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[#007AFF] text-xl font-light text-white shadow-sm"
                 aria-label="Ajouter une catégorie"
               >
                 +
               </button>
-            )}
+            </div>
           </div>
+        ) : (
+          <ShoppingSections
+            categories={categories}
+            editMode={editMode}
+            wiggleCategories={wiggleCategories}
+            wiggleItems={wiggleItems}
+            highlightedItemId={highlightedItemId}
+            creatingCategory={creatingCategory}
+            editingCategoryId={editingCategoryId}
+            onCreateCategory={() => setCreatingCategory(true)}
+            onCancelCreateCategory={() => setCreatingCategory(false)}
+            onSaveCategory={async (name, color) => {
+              await addCategory(name, color);
+              setCreatingCategory(false);
+            }}
+            onCancelEditCategory={() => setEditingCategoryId(null)}
+            onSaveEditCategory={async (name, color) => {
+              if (!editingCategoryId) return;
+              await updateCategory(editingCategoryId, { name, color });
+              setEditingCategoryId(null);
+            }}
+            onCategoryDragEnd={handleCategoryDragEnd}
+            onToggleOpen={toggleCategoryOpen}
+            onEditCategory={setEditingCategoryId}
+            onDeleteCategory={deleteCategory}
+            onLongPressCategory={enterCategoryEditMode}
+            onToggleCategoryChecked={setCategoryChecked}
+            onAddItem={addItem}
+            onUpdateItem={updateItem}
+            onDeleteItem={deleteItem}
+            onToggleItemChecked={toggleItemChecked}
+            onLongPressItem={enterItemEditMode}
+            onReorderItems={reorderItems}
+          />
+        )}
 
-          {creatingCategory && (
-            <div className="mb-4">
-              <CategoryEditor
-                onCancel={() => setCreatingCategory(false)}
-                onSave={async (name, color) => {
-                  await addCategory(name, color);
-                  setCreatingCategory(false);
-                }}
-              />
-            </div>
-          )}
-
-          {editingCategoryId && (
-            <div className="mb-4">
-              <CategoryEditor
-                initialName={categories.find((c) => c.id === editingCategoryId)?.name}
-                initialColor={
-                  categories.find((c) => c.id === editingCategoryId)?.color ??
-                  CATEGORY_COLORS[0].value
-                }
-                onCancel={() => setEditingCategoryId(null)}
-                onSave={async (name, color) => {
-                  await updateCategory(editingCategoryId, { name, color });
-                  setEditingCategoryId(null);
-                }}
-              />
-            </div>
-          )}
-
-          <DndContext
-            sensors={categorySensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleCategoryDragEnd}
-          >
-            <SortableContext
-              items={categories.map((category) => category.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-3">
-                {categories.length === 0 && (
-                  <p className="rounded-2xl bg-white px-4 py-8 text-center text-sm text-[#8E8E93] shadow-sm ring-1 ring-[#E5E5EA]/80">
-                    Appuyez sur + pour créer votre première catégorie.
-                  </p>
-                )}
-                {categories.map((category) => (
-                  <SortableCategoryCard
-                    key={category.id}
-                    category={category}
-                    editMode={editMode}
-                    wiggleCategories={wiggleCategories}
-                    wiggleItems={wiggleItems}
-                    highlightedItemId={highlightedItemId}
-                    onToggleOpen={() => toggleCategoryOpen(category.id)}
-                    onEditCategory={() => setEditingCategoryId(category.id)}
-                    onDeleteCategory={() => deleteCategory(category.id)}
-                    onLongPressCategory={enterCategoryEditMode}
-                    onToggleCategoryChecked={(checked) => setCategoryChecked(category.id, checked)}
-                    onAddItem={(payload) => addItem(category.id, payload)}
-                    onUpdateItem={(id, payload) => updateItem(id, payload)}
-                    onDeleteItem={deleteItem}
-                    onToggleItemChecked={toggleItemChecked}
-                    onLongPressItem={enterItemEditMode}
-                    onReorderItems={(orderedIds) => reorderItems(category.id, orderedIds)}
-                  />
-                ))}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </section>
-
-        <ShoppingSections categories={categories} onItemClick={scrollToItem} />
+        {creatingCategory && categories.length === 0 && (
+          <div className="mt-4 px-4">
+            <CategoryEditor
+              onCancel={() => setCreatingCategory(false)}
+              onSave={async (name, color) => {
+                await addCategory(name, color);
+                setCreatingCategory(false);
+              }}
+            />
+          </div>
+        )}
       </main>
 
       <SearchOverlay
