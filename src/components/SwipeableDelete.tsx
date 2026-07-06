@@ -27,6 +27,7 @@ export function SwipeableDelete({
   const [isDragging, setIsDragging] = useState(false);
   const isDeletingRef = useRef(false);
   const revealedRef = useRef(false);
+  const revealedAtDragStartRef = useRef(false);
 
   useEffect(() => {
     revealedRef.current = revealed;
@@ -77,6 +78,7 @@ export function SwipeableDelete({
   }, [notifyOpen, onDelete, x]);
 
   const handleDragStart = useCallback(() => {
+    revealedAtDragStartRef.current = revealedRef.current;
     notifyOpen(true);
     setIsDragging(true);
   }, [notifyOpen]);
@@ -84,6 +86,9 @@ export function SwipeableDelete({
   const handleDrag = useCallback(
     (_: unknown, info: PanInfo) => {
       notifyOpen(true);
+
+      if (revealedAtDragStartRef.current) return;
+
       if (!revealedRef.current && info.offset.x >= REVEAL_OFFSET - 4) {
         setRevealed(true);
         revealedRef.current = true;
@@ -101,9 +106,9 @@ export function SwipeableDelete({
 
       const offsetX = info.offset.x;
       const velocityX = info.velocity.x;
+      const position = x.get();
 
-      if (revealedRef.current) {
-        const position = x.get();
+      if (revealedAtDragStartRef.current) {
         if (position > DELETE_THRESHOLD || velocityX > 400) {
           handleDelete();
           return;
@@ -119,7 +124,7 @@ export function SwipeableDelete({
         return;
       }
 
-      if (offsetX > 40 || velocityX > 300) {
+      if (offsetX > 40 || velocityX > 300 || position > 40) {
         setRevealed(true);
         revealedRef.current = true;
         vibrate(20);
