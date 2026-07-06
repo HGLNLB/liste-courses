@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "./Checkbox";
+import { useDragListeners } from "@/hooks/useDragListeners";
 import { useSwipeDelete } from "@/hooks/useSwipeDelete";
 import { formatItemLabel } from "@/lib/utils";
 import type { Item } from "@/lib/types";
@@ -41,16 +42,29 @@ export function ItemRow({
   onDelete,
 }: ItemRowProps) {
   const draggedRef = useRef(false);
+  const dragBlockedRef = useRef(false);
 
-  const { x, deleteOpacity, isSwipeActive, captureHandlers } = useSwipeDelete({
+  const blockDrag = useCallback(() => {
+    dragBlockedRef.current = true;
+  }, []);
+
+  const unblockDrag = useCallback(() => {
+    dragBlockedRef.current = false;
+  }, []);
+
+  const { x, deleteOpacity, isSwipeActive, revealed, captureHandlers } = useSwipeDelete({
     enabled: swipeEnabled,
     onDelete,
+    onEngage: blockDrag,
+    onRelease: unblockDrag,
   });
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: !dragEnabled || isSwipeActive,
+    disabled: !dragEnabled || isSwipeActive || revealed,
   });
+
+  const dragListeners = useDragListeners(listeners, dragBlockedRef);
 
   useEffect(() => {
     if (isDragging) {
@@ -101,24 +115,30 @@ export function ItemRow({
           {...attributes}
         >
           {dragEnabled ? (
-            <div
-              className="flex min-w-0 flex-1"
-              data-drag-zone
-              {...listeners}
-            >
-              <DragHandle />
+            <>
+              <div className="shrink-0" data-drag-zone {...dragListeners}>
+                <DragHandle />
+              </div>
               <div
                 role="button"
                 tabIndex={0}
+                data-drag-zone
+                {...dragListeners}
                 onClick={() => {
                   if (!draggedRef.current && !isDragging) onEdit();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    if (!draggedRef.current && !isDragging) onEdit();
+                  }
                 }}
                 className="min-w-0 flex-1 py-3 pr-2 text-left"
               >
                 <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
                 {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
               </div>
-            </div>
+            </>
           ) : (
             <>
               <DragHandle />

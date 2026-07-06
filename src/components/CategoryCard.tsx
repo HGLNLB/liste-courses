@@ -7,7 +7,7 @@ import {
   closestCenter,
   type DragEndEvent,
   type DragStartEvent,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -83,7 +83,7 @@ export function CategoryCard({
 
   const itemSensors = useSensors(
     useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 10 } }),
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
   );
 
   const visibleItems = category.items.filter((item) => {

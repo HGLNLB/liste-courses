@@ -7,14 +7,16 @@ import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
 const DELETE_THRESHOLD = 140;
-const SWIPE_START_PX = 14;
+const SWIPE_START_PX = 10;
 
 type UseSwipeDeleteOptions = {
   enabled: boolean;
   onDelete: () => void;
+  onEngage?: () => void;
+  onRelease?: () => void;
 };
 
-export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
+export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSwipeDeleteOptions) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [0, REVEAL_OFFSET], [0, 1]);
   const [revealed, setRevealed] = useState(false);
@@ -104,8 +106,9 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       scrollLockedRef.current = true;
       lockScroll();
     }
+    onEngage?.();
     setIsSwipeActive(true);
-  }, []);
+  }, [onEngage]);
 
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {
@@ -148,8 +151,9 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
 
     gestureRef.current = null;
     setIsSwipeActive(false);
+    onRelease?.();
     releaseScroll();
-  }, [enabled, finishSwipe, releaseScroll, x]);
+  }, [enabled, finishSwipe, onRelease, releaseScroll, x]);
 
   const captureHandlers = {
     onTouchStartCapture: (event: React.TouchEvent) => {
@@ -175,6 +179,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       if (!enabled) return;
       if (gestureRef.current === "swipe") {
         event.stopPropagation();
+        event.preventDefault();
       }
       endGesture();
     },
@@ -182,6 +187,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       if (!enabled) return;
       if (gestureRef.current === "swipe") {
         event.stopPropagation();
+        event.preventDefault();
       }
       endGesture();
     },
@@ -191,6 +197,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
     x,
     deleteOpacity,
     isSwipeActive,
+    revealed,
     captureHandlers,
   };
 }
