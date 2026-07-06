@@ -1,14 +1,28 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import { AnimatePresence, Reorder, motion } from "framer-motion";
+import { useState, useCallback, useRef, type HTMLAttributes } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  type DragEndEvent,
+  type DragStartEvent,
+  MouseSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { AnimatePresence, motion } from "framer-motion";
 import { Checkbox } from "./Checkbox";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { ItemRow } from "./ItemRow";
 import { ItemEditor } from "./ItemEditor";
 import { AnimatedCollapse } from "./AnimatedCollapse";
 import { SwipeableDelete } from "./SwipeableDelete";
 import { useLongPress } from "@/hooks/useLongPress";
-import { vibrate } from "@/lib/utils";
+import { vibrate, formatItemLabel } from "@/lib/utils";
 import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 
@@ -34,6 +48,7 @@ type CategoryCardProps = {
   onDeleteItem: (id: string) => void;
   onToggleItemChecked: (id: string, checked: boolean) => void;
   onReorderItems: (orderedIds: string[]) => void;
+  categoryDragHandleProps?: HTMLAttributes<HTMLDivElement>;
 };
 
 export function CategoryCard({
@@ -55,17 +70,25 @@ export function CategoryCard({
   onDeleteItem,
   onToggleItemChecked,
   onReorderItems,
+  categoryDragHandleProps,
 }: CategoryCardProps) {
   const [addingItem, setAddingItem] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [activeSwipeItemId, setActiveSwipeItemId] = useState<string | null>(null);
   const [categorySwipeOpen, setCategorySwipeOpen] = useState(false);
   const [itemSwipeOpenId, setItemSwipeOpenId] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const categorySwipeBlockedRef = useRef(false);
 
   const categoryEditActive = editMode === "categories";
   const itemsInteractive = editMode === "none" && !categoryEditActive;
   const categorySwipeEnabled = editMode === "none" && !categoryEditActive;
+
+  const itemSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { delay: 3000, tolerance: 30 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+  );
 
   const handleCategorySwipeOpenChange = useCallback((open: boolean) => {
     categorySwipeBlockedRef.current = open;
@@ -85,28 +108,63 @@ export function CategoryCard({
     return true;
   });
 
-  const reorderableItems = visibleItems.filter((item) => item.id !== editingItemId);
+  const reorderableItemIds = visibleItems
+    .filter((item) => item.id !== editingItemId)
+    .map((item) => item.id);
 
-  const handleItemReorder = useCallback(
-    (reordered: typeof visibleItems) => {
-      const visibleSet = new Set(reordered.map((item) => item.id));
-      const hiddenItems = category.items.filter((item) => !visibleSet.has(item.id));
-      const merged = [...reordered, ...hiddenItems];
-      onReorderItems(merged.map((item) => item.id));
-    },
-    [category.items, onReorderItems],
-  );
+  const handleItemDragStart = (event: DragStartEvent) => {
+    setActiveSwipeItemId(null);
+    vibrate([30, 20, 30]);
+    setDraggingItemId(String(event.active.id));
+  };
+
+  const handleItemDragEnd = (event: DragEndEvent) => {
+    setDraggingItemId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const visibleIds = visibleItems
+      .filter((item) => item.id !== editingItemId)
+      .map((item) => item.id);
+    const oldIndex = visibleIds.indexOf(String(active.id));
+    const newIndex = visibleIds.indexOf(String(over.id));
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const nextVisible = [...visibleIds];
+    const [moved] = nextVisible.splice(oldIndex, 1);
+    nextVisible.splice(newIndex, 0, moved);
+
+    const visibleSet = new Set(nextVisible);
+    const hiddenItems = category.items.filter((item) => !visibleSet.has(item.id));
+    const reorderedVisible = nextVisible
+      .map((id) => category.items.find((item) => item.id === id))
+      .filter(Boolean) as typeof category.items;
+    const merged = [...reorderedVisible, ...hiddenItems];
+    onReorderItems(merged.map((item) => item.id));
+  };
+
+  const draggingItem = visibleItems.find((entry) => entry.id === draggingItemId);
+
+  const isEmptyCategory = category.items.length === 0;
 
   const categoryChecked =
-    sectionType === "toBuy" ? false : sectionType === "notNeeded" ? true : category.is_checked;
+    sectionType === "toBuy"
+      ? isEmptyCategory
+        ? category.is_checked
+        : false
+      : sectionType === "notNeeded"
+        ? isEmptyCategory
+          ? category.is_checked
+          : true
+        : category.is_checked;
 
   const handleCategoryChecked = (checked: boolean) => {
     if (sectionType === "toBuy") {
-      onToggleCategoryChecked(true);
+      onToggleCategoryChecked(isEmptyCategory ? checked : true);
       return;
     }
     if (sectionType === "notNeeded") {
-      onToggleCategoryChecked(false);
+      onToggleCategoryChecked(isEmptyCategory ? checked : false);
       return;
     }
     onToggleCategoryChecked(checked);
@@ -137,17 +195,32 @@ export function CategoryCard({
       >
         <div className="flex items-center gap-2 bg-white px-3 py-3 select-none" data-category-header>
           {categoryEditActive && (
-            <button
-              type="button"
-              aria-label="Supprimer la catégorie"
-              onClick={(event) => {
-                event.stopPropagation();
-                onDeleteCategory();
-              }}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] text-sm font-bold text-white"
-            >
-              −
-            </button>
+            <>
+              <button
+                type="button"
+                aria-label="Supprimer la catégorie"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] text-sm font-bold text-white"
+              >
+                −
+              </button>
+              {categoryDragHandleProps && (
+                <div
+                  {...categoryDragHandleProps}
+                  className="flex shrink-0 touch-none cursor-grab px-1 active:cursor-grabbing"
+                  aria-label="Réorganiser la catégorie"
+                >
+                  <div className="flex flex-col items-center justify-center gap-[3px] py-2 opacity-40">
+                    <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+                    <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+                    <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <button
@@ -191,69 +264,88 @@ export function CategoryCard({
         </div>
       </SwipeableDelete>
 
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Supprimer la catégorie ?"
+        message={`« ${category.name} » et tous ses éléments seront supprimés définitivement.`}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={() => {
+          setShowDeleteConfirm(false);
+          onDeleteCategory();
+        }}
+      />
+
       <AnimatedCollapse open={category.is_open}>
         <div className="border-t border-[#F2F2F7]">
-          <AnimatePresence initial={false}>
-            {visibleItems.map((item) =>
-              editingItemId === item.id ? (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={listItemTransition}
-                  className="overflow-hidden"
-                >
-                  <div className="px-3 py-2">
-                    <ItemEditor
-                      initial={item}
-                      onCancel={() => setEditingItemId(null)}
-                      onSave={(payload) => {
-                        onUpdateItem(item.id, payload);
-                        setEditingItemId(null);
+          <DndContext
+            sensors={itemSensors}
+            collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalAxis]}
+            onDragStart={handleItemDragStart}
+            onDragEnd={handleItemDragEnd}
+            onDragCancel={() => setDraggingItemId(null)}
+          >
+            <SortableContext items={reorderableItemIds} strategy={verticalListSortingStrategy}>
+              <AnimatePresence initial={false}>
+                {visibleItems.map((item) =>
+                  editingItemId === item.id ? (
+                    <motion.div
+                      key={item.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={listItemTransition}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 py-2">
+                        <ItemEditor
+                          initial={item}
+                          onCancel={() => setEditingItemId(null)}
+                          onSave={(payload) => {
+                            onUpdateItem(item.id, payload);
+                            setEditingItemId(null);
+                          }}
+                        />
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      dragEnabled={itemsInteractive}
+                      swipeEnabled={itemsInteractive}
+                      swipeActive={activeSwipeItemId === item.id}
+                      swipeBlocked={itemSwipeOpenId === item.id}
+                      highlighted={highlightedItemId === item.id}
+                      showCheckbox={editMode === "none"}
+                      onSwipeActivate={() => setActiveSwipeItemId(item.id)}
+                      onSwipeRelease={() => {
+                        setActiveSwipeItemId((current) => (current === item.id ? null : current));
+                      }}
+                      onSwipeOpenChange={(open) => handleItemSwipeOpenChange(item.id, open)}
+                      onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
+                      onEdit={() => {
+                        if (itemSwipeOpenId === item.id) return;
+                        setEditingItemId(item.id);
+                      }}
+                      onDelete={() => {
+                        setActiveSwipeItemId(null);
+                        setItemSwipeOpenId(null);
+                        onDeleteItem(item.id);
                       }}
                     />
-                  </div>
-                </motion.div>
-              ) : null,
-            )}
-          </AnimatePresence>
-
-          <Reorder.Group
-            axis="y"
-            values={reorderableItems}
-            onReorder={handleItemReorder}
-            className="bg-white"
-          >
-            {reorderableItems.map((item) => (
-              <ItemRow
-                key={item.id}
-                item={item}
-                dragEnabled={itemsInteractive}
-                swipeEnabled={itemsInteractive}
-                swipeActive={activeSwipeItemId === item.id}
-                swipeBlocked={itemSwipeOpenId === item.id}
-                highlighted={highlightedItemId === item.id}
-                showCheckbox={editMode === "none"}
-                onSwipeActivate={() => setActiveSwipeItemId(item.id)}
-                onSwipeRelease={() => {
-                  setActiveSwipeItemId((current) => (current === item.id ? null : current));
-                }}
-                onSwipeOpenChange={(open) => handleItemSwipeOpenChange(item.id, open)}
-                onDragStart={() => setActiveSwipeItemId(null)}
-                onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
-                onEdit={() => {
-                  if (itemSwipeOpenId === item.id) return;
-                  setEditingItemId(item.id);
-                }}
-                onDelete={() => {
-                  setActiveSwipeItemId(null);
-                  setItemSwipeOpenId(null);
-                  onDeleteItem(item.id);
-                }}
-              />
-            ))}
-          </Reorder.Group>
+                  ),
+                )}
+              </AnimatePresence>
+            </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {draggingItem ? (
+                <div className="flex items-center rounded-xl bg-white px-4 py-3 shadow-lg ring-1 ring-[#E5E5EA]">
+                  <p className="text-base text-[#1C1C1E]">{formatItemLabel(draggingItem)}</p>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
 
           {itemsInteractive && showAddItem && (
             <div className="px-3 py-2">

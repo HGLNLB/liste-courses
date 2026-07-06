@@ -47,14 +47,15 @@ export function useShoppingList(userId: string | undefined) {
       return acc;
     }, {});
 
-    const merged: CategoryWithItems[] = sortByPosition(categoriesData ?? []).map((category) => ({
-      ...category,
-      is_checked: isCategoryFullyChecked({
+    const merged: CategoryWithItems[] = sortByPosition(categoriesData ?? []).map((category) => {
+      const items = sortByPosition(itemsByCategory[category.id] ?? []);
+      return {
         ...category,
-        items: sortByPosition(itemsByCategory[category.id] ?? []),
-      }),
-      items: sortByPosition(itemsByCategory[category.id] ?? []),
-    }));
+        items,
+        is_checked:
+          items.length === 0 ? category.is_checked : isCategoryFullyChecked({ ...category, items }),
+      };
+    });
 
     setCategories(merged);
     setLoading(false);
@@ -162,11 +163,12 @@ export function useShoppingList(userId: string | undefined) {
         ),
       );
 
-      await Promise.all(
-        category.items.map((item) =>
+      await Promise.all([
+        supabase.from("categories").update({ is_checked: checked }).eq("id", categoryId),
+        ...category.items.map((item) =>
           supabase.from("items").update({ is_checked: checked }).eq("id", item.id),
         ),
-      );
+      ]);
     },
     [categories, supabase],
   );

@@ -32,14 +32,21 @@ export function vibrate(pattern: number | number[] = 40): void {
 }
 
 export function getToBuyCategories(categories: CategoryWithItems[]) {
-  return categories.filter(
-    (category) =>
-      category.items.length === 0 || category.items.some((item) => !item.is_checked),
-  );
+  return categories.filter((category) => {
+    if (category.items.length === 0) {
+      return !category.is_checked;
+    }
+    return category.items.some((item) => !item.is_checked);
+  });
 }
 
 export function getNotNeededCategories(categories: CategoryWithItems[]) {
-  return categories.filter((category) => category.items.some((item) => item.is_checked));
+  return categories.filter((category) => {
+    if (category.items.length === 0) {
+      return category.is_checked;
+    }
+    return category.items.some((item) => item.is_checked);
+  });
 }
 
 export function getUncheckedGroups(categories: CategoryWithItems[]) {
@@ -61,5 +68,8 @@ export function getCheckedGroups(categories: CategoryWithItems[]) {
 }
 
 export function isCategoryFullyChecked(category: CategoryWithItems): boolean {
-  return category.items.length > 0 && category.items.every((item) => item.is_checked);
+  if (category.items.length === 0) {
+    return category.is_checked;
+  }
+  return category.items.every((item) => item.is_checked);
 }
