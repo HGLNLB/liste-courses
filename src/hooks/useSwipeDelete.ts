@@ -7,8 +7,7 @@ import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
 const DELETE_THRESHOLD = 140;
-const SWIPE_LOCK_PX = 10;
-const LONG_PRESS_HINT_MS = 400;
+const SWIPE_START_PX = 14;
 
 type UseSwipeDeleteOptions = {
   enabled: boolean;
@@ -19,12 +18,12 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [0, REVEAL_OFFSET], [0, 1]);
   const [revealed, setRevealed] = useState(false);
+  const [isSwipeActive, setIsSwipeActive] = useState(false);
   const revealedRef = useRef(false);
   const isDeletingRef = useRef(false);
   const scrollLockedRef = useRef(false);
-  const gestureRef = useRef<"pending" | "swipe" | "vertical" | "longpress" | null>(null);
+  const gestureRef = useRef<"pending" | "swipe" | "vertical" | null>(null);
   const startRef = useRef({ x: 0, y: 0 });
-  const touchStartTimeRef = useRef(0);
 
   useEffect(() => {
     revealedRef.current = revealed;
@@ -41,6 +40,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
     if (!enabled) {
       setRevealed(false);
       revealedRef.current = false;
+      setIsSwipeActive(false);
       x.set(0);
       gestureRef.current = null;
       releaseScroll();
@@ -104,33 +104,21 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       scrollLockedRef.current = true;
       lockScroll();
     }
+    setIsSwipeActive(true);
   }, []);
 
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {
-      if (!enabled || gestureRef.current === "vertical" || gestureRef.current === "longpress") {
-        return false;
-      }
+      if (!enabled || gestureRef.current === "vertical") return false;
 
       const dx = clientX - startRef.current.x;
       const dy = clientY - startRef.current.y;
-      const elapsed = Date.now() - touchStartTimeRef.current;
 
       if (gestureRef.current === "pending") {
-        if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) {
-          if (elapsed >= LONG_PRESS_HINT_MS) {
-            gestureRef.current = "longpress";
-          }
-          return false;
-        }
+        if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return false;
 
         if (Math.abs(dy) > Math.abs(dx)) {
           gestureRef.current = "vertical";
-          return false;
-        }
-
-        if (elapsed >= LONG_PRESS_HINT_MS && Math.abs(dx) < 25) {
-          gestureRef.current = "longpress";
           return false;
         }
 
@@ -159,6 +147,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
     }
 
     gestureRef.current = null;
+    setIsSwipeActive(false);
     releaseScroll();
   }, [enabled, finishSwipe, releaseScroll, x]);
 
@@ -168,7 +157,6 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       const touch = event.touches[0];
       if (!touch) return;
       gestureRef.current = "pending";
-      touchStartTimeRef.current = Date.now();
       startRef.current = { x: touch.clientX, y: touch.clientY };
     },
     onTouchMoveCapture: (event: React.TouchEvent) => {
@@ -202,6 +190,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
   return {
     x,
     deleteOpacity,
+    isSwipeActive,
     captureHandlers,
   };
 }

@@ -42,14 +42,14 @@ export function ItemRow({
 }: ItemRowProps) {
   const draggedRef = useRef(false);
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: !dragEnabled,
+  const { x, deleteOpacity, isSwipeActive, captureHandlers } = useSwipeDelete({
+    enabled: swipeEnabled,
+    onDelete,
   });
 
-  const { x, deleteOpacity, captureHandlers } = useSwipeDelete({
-    enabled: swipeEnabled && !isDragging,
-    onDelete,
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+    disabled: !dragEnabled || isSwipeActive,
   });
 
   useEffect(() => {
@@ -72,7 +72,11 @@ export function ItemRow({
   };
 
   return (
-    <div className="relative overflow-hidden select-none" data-item-row>
+    <div
+      className="relative overflow-hidden select-none"
+      data-item-row
+      {...(swipeEnabled && !isDragging ? captureHandlers : {})}
+    >
       {swipeEnabled && (
         <motion.div
           className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
@@ -85,8 +89,7 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className="relative bg-white"
-        {...(swipeEnabled ? captureHandlers : {})}
+        className={`relative bg-white ${isSwipeActive ? "touch-none" : ""}`}
       >
         <div
           ref={setNodeRef}
@@ -99,7 +102,7 @@ export function ItemRow({
         >
           {dragEnabled ? (
             <div
-              className="flex min-w-0 flex-1 touch-none"
+              className="flex min-w-0 flex-1"
               data-drag-zone
               {...listeners}
             >
