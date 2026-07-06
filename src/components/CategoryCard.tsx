@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback, useRef, type HTMLAttributes } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import type { DraggableAttributes } from "@dnd-kit/core";
+import type { SyntheticListenerMap } from "@dnd-kit/core/dist/hooks/utilities";
 import {
   DndContext,
   DragOverlay,
@@ -21,7 +23,9 @@ import { ItemRow } from "./ItemRow";
 import { ItemEditor } from "./ItemEditor";
 import { AnimatedCollapse } from "./AnimatedCollapse";
 import { SwipeableDelete } from "./SwipeableDelete";
-import { useLongPress } from "@/hooks/useLongPress";
+import { useCategoryEditPress } from "@/hooks/useCategoryEditPress";
+import { GESTURE } from "@/lib/gestures";
+import { mergeDragListeners, sortableDropAnimation } from "@/lib/dnd";
 import { vibrate, formatItemLabel } from "@/lib/utils";
 import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
@@ -35,6 +39,7 @@ type CategoryCardProps = {
   sectionType?: "toBuy" | "notNeeded";
   showAddItem?: boolean;
   dimmed?: boolean;
+  isCategoryDragging?: boolean;
   onToggleOpen: () => void;
   onEditCategory: () => void;
   onDeleteCategory: () => void;
@@ -48,8 +53,23 @@ type CategoryCardProps = {
   onDeleteItem: (id: string) => void;
   onToggleItemChecked: (id: string, checked: boolean) => void;
   onReorderItems: (orderedIds: string[]) => void;
-  categoryDragHandleProps?: HTMLAttributes<HTMLDivElement>;
+  categoryHeaderAttributes?: DraggableAttributes;
+  categoryHeaderListeners?: SyntheticListenerMap;
 };
+
+function CategoryDragHandle() {
+  return (
+    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-1 opacity-40" aria-hidden="true">
+      <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+      <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+      <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+    </div>
+  );
+}
+
+function stopDragPointer(event: React.PointerEvent) {
+  event.stopPropagation();
+}
 
 export function CategoryCard({
   category,
@@ -60,6 +80,7 @@ export function CategoryCard({
   sectionType,
   showAddItem = true,
   dimmed = false,
+  isCategoryDragging = false,
   onToggleOpen,
   onEditCategory,
   onDeleteCategory,
@@ -70,7 +91,8 @@ export function CategoryCard({
   onDeleteItem,
   onToggleItemChecked,
   onReorderItems,
-  categoryDragHandleProps,
+  categoryHeaderAttributes,
+  categoryHeaderListeners,
 }: CategoryCardProps) {
   const [addingItem, setAddingItem] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -86,7 +108,12 @@ export function CategoryCard({
   const categorySwipeEnabled = editMode === "none" && !categoryEditActive;
 
   const itemSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { delay: 3000, tolerance: 30 } }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: GESTURE.ITEM_DRAG_DELAY_MS,
+        tolerance: GESTURE.MOVE_TOLERANCE_PX,
+      },
+    }),
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
   );
 
@@ -101,6 +128,28 @@ export function CategoryCard({
       return current === itemId ? null : current;
     });
   }, []);
+
+  const categoryEditPress = useCategoryEditPress({
+    enabled: editMode === "none" && !categorySwipeOpen,
+    blockedRef: categorySwipeBlockedRef,
+    onEditModeRequest: () => {
+      vibrate();
+      onLongPressCategory();
+    },
+  });
+
+  useEffect(() => {
+    if (isCategoryDragging || categorySwipeOpen) {
+      categoryEditPress.cancel();
+    }
+  }, [categoryEditPress, categorySwipeOpen, isCategoryDragging]);
+
+  const mergedHeaderListeners = categoryHeaderListeners
+    ? mergeDragListeners(categoryHeaderListeners, {
+        onPointerDown: categoryEditPress.onPointerDown,
+        onPointerUp: categoryEditPress.onPointerUp,
+      })
+    : undefined;
 
   const visibleItems = category.items.filter((item) => {
     if (itemFilter === "unchecked") return !item.is_checked;
@@ -170,16 +219,90 @@ export function CategoryCard({
     onToggleCategoryChecked(checked);
   };
 
-  const categoryLongPress = useLongPress({
-    blockedRef: categorySwipeBlockedRef,
-    moveTolerance: 10,
-    onLongPress: () => {
-      vibrate();
-      onLongPressCategory();
-    },
-    onClick: onEditCategory,
-    disabled: categoryEditActive || categorySwipeOpen,
-  });
+  const headerInner = (
+    <>
+      {categoryEditActive && <CategoryDragHandle />}
+
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        onPointerDown={stopDragPointer}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8E8E93]"
+        aria-label={category.is_open ? "Replier" : "Déplier"}
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          className={`transition-transform duration-200 ease-out ${category.is_open ? "rotate-90" : ""}`}
+          aria-hidden="true"
+        >
+          <path d="M4 2L9 6L4 10" stroke="currentColor" strokeWidth="1.5" fill="none" />
+        </svg>
+      </button>
+
+      {categoryEditActive ? (
+        <h2 className="min-w-0 flex-1 truncate text-left text-lg font-semibold text-[#1C1C1E]">
+          {category.name}
+        </h2>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            if (categorySwipeOpen || isCategoryDragging) return;
+            onEditCategory();
+          }}
+          className={`min-w-0 flex-1 text-left ${categorySwipeOpen ? "pointer-events-none" : ""}`}
+        >
+          <h2 className="truncate text-lg font-semibold text-[#1C1C1E]">{category.name}</h2>
+        </button>
+      )}
+    </>
+  );
+
+  const headerRow = (
+    <div className="flex items-center gap-2 bg-white px-3 py-3 select-none" data-category-header>
+      {categoryEditActive && (
+        <button
+          type="button"
+          aria-label="Supprimer la catégorie"
+          onPointerDown={stopDragPointer}
+          onClick={(event) => {
+            event.stopPropagation();
+            setShowDeleteConfirm(true);
+          }}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] text-sm font-bold text-white"
+        >
+          −
+        </button>
+      )}
+
+      {mergedHeaderListeners ? (
+        <div
+          {...categoryHeaderAttributes}
+          {...mergedHeaderListeners}
+          className={`flex min-w-0 flex-1 items-center gap-2 touch-manipulation ${
+            isCategoryDragging ? "cursor-grabbing" : "cursor-grab"
+          }`}
+          aria-label="Réorganiser la catégorie"
+        >
+          {headerInner}
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 items-center gap-2">{headerInner}</div>
+      )}
+
+      {editMode === "none" && (
+        <div onPointerDown={stopDragPointer} className="shrink-0">
+          <Checkbox
+            checked={categoryChecked}
+            onChange={handleCategoryChecked}
+            ariaLabel={`Cocher la catégorie ${category.name}`}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <section
@@ -188,81 +311,17 @@ export function CategoryCard({
       } ${dimmed ? "opacity-70" : ""}`}
       style={{ borderLeft: `4px solid ${category.color}` }}
     >
-      <SwipeableDelete
-        enabled={categorySwipeEnabled}
-        onDelete={onDeleteCategory}
-        onSwipeOpenChange={handleCategorySwipeOpenChange}
-      >
-        <div className="flex items-center gap-2 bg-white px-3 py-3 select-none" data-category-header>
-          {categoryEditActive && (
-            <>
-              <button
-                type="button"
-                aria-label="Supprimer la catégorie"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowDeleteConfirm(true);
-                }}
-                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#FF3B30] text-sm font-bold text-white"
-              >
-                −
-              </button>
-              {categoryDragHandleProps && (
-                <div
-                  {...categoryDragHandleProps}
-                  className="flex shrink-0 touch-none cursor-grab px-1 active:cursor-grabbing"
-                  aria-label="Réorganiser la catégorie"
-                >
-                  <div className="flex flex-col items-center justify-center gap-[3px] py-2 opacity-40">
-                    <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
-                    <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
-                    <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-
-          <button
-            type="button"
-            onClick={onToggleOpen}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8E8E93]"
-            aria-label={category.is_open ? "Replier" : "Déplier"}
-          >
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 12 12"
-              className={`transition-transform duration-200 ease-out ${category.is_open ? "rotate-90" : ""}`}
-              aria-hidden="true"
-            >
-              <path d="M4 2L9 6L4 10" stroke="currentColor" strokeWidth="1.5" fill="none" />
-            </svg>
-          </button>
-
-          {categoryEditActive ? (
-            <h2 className="min-w-0 flex-1 truncate text-left text-lg font-semibold text-[#1C1C1E]">
-              {category.name}
-            </h2>
-          ) : (
-            <button
-              type="button"
-              className={`min-w-0 flex-1 text-left ${categorySwipeOpen ? "pointer-events-none" : ""}`}
-              {...categoryLongPress}
-            >
-              <h2 className="truncate text-lg font-semibold text-[#1C1C1E]">{category.name}</h2>
-            </button>
-          )}
-
-          {editMode === "none" && (
-            <Checkbox
-              checked={categoryChecked}
-              onChange={handleCategoryChecked}
-              ariaLabel={`Cocher la catégorie ${category.name}`}
-            />
-          )}
-        </div>
-      </SwipeableDelete>
+      {categorySwipeEnabled ? (
+        <SwipeableDelete
+          enabled={categorySwipeEnabled}
+          onDelete={onDeleteCategory}
+          onSwipeOpenChange={handleCategorySwipeOpenChange}
+        >
+          {headerRow}
+        </SwipeableDelete>
+      ) : (
+        headerRow
+      )}
 
       <ConfirmDialog
         open={showDeleteConfirm}
@@ -338,7 +397,7 @@ export function CategoryCard({
                 )}
               </AnimatePresence>
             </SortableContext>
-            <DragOverlay dropAnimation={null}>
+            <DragOverlay dropAnimation={sortableDropAnimation}>
               {draggingItem ? (
                 <div className="flex items-center rounded-xl bg-white px-4 py-3 shadow-lg ring-1 ring-[#E5E5EA]">
                   <p className="text-base text-[#1C1C1E]">{formatItemLabel(draggingItem)}</p>

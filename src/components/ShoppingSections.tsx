@@ -1,12 +1,15 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   type DragEndEvent,
+  type DragStartEvent,
+  MouseSensor,
   PointerSensor,
-  TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -16,7 +19,9 @@ import { SortableCategoryCard } from "./SortableCategoryCard";
 import { CategoryCard } from "./CategoryCard";
 import { CategoryEditor } from "./CategoryEditor";
 import { AnimatedCategoryWrapper } from "./AnimatedCategoryWrapper";
-import { getNotNeededCategories, getToBuyCategories } from "@/lib/utils";
+import { GESTURE } from "@/lib/gestures";
+import { sortableDropAnimation } from "@/lib/dnd";
+import { getNotNeededCategories, getToBuyCategories, vibrate } from "@/lib/utils";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 import { CATEGORY_COLORS } from "@/lib/types";
 
@@ -75,13 +80,40 @@ export function ShoppingSections({
   onToggleItemChecked,
   onReorderItems,
 }: ShoppingSectionsProps) {
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+
   const toBuyCategories = getToBuyCategories(categories);
   const notNeededCategories = getNotNeededCategories(categories);
 
+  const categoryDragDelay =
+    editMode === "categories"
+      ? GESTURE.CATEGORY_DRAG_DELAY_EDIT_MS
+      : GESTURE.CATEGORY_DRAG_DELAY_MS;
+
   const categorySensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: categoryDragDelay,
+        tolerance: GESTURE.MOVE_TOLERANCE_PX,
+      },
+    }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
   );
+
+  const draggingCategory = useMemo(
+    () => categories.find((category) => category.id === draggingCategoryId) ?? null,
+    [categories, draggingCategoryId],
+  );
+
+  const handleCategoryDragStart = (event: DragStartEvent) => {
+    vibrate([30, 20, 30]);
+    setDraggingCategoryId(String(event.active.id));
+  };
+
+  const handleCategoryDragEnd = (event: DragEndEvent) => {
+    onCategoryDragEnd(event);
+    setDraggingCategoryId(null);
+  };
 
   const renderCategoryCard = (
     category: CategoryWithItems,
@@ -165,7 +197,9 @@ export function ShoppingSections({
             sensors={categorySensors}
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}
-            onDragEnd={onCategoryDragEnd}
+            onDragStart={handleCategoryDragStart}
+            onDragEnd={handleCategoryDragEnd}
+            onDragCancel={() => setDraggingCategoryId(null)}
           >
             <SortableContext
               items={toBuyCategories.map((category) => category.id)}
@@ -174,7 +208,7 @@ export function ShoppingSections({
               <div className="space-y-3">
                 <AnimatePresence initial={false} mode="popLayout">
                   {toBuyCategories.map((category) => (
-                    <AnimatedCategoryWrapper key={category.id}>
+                    <AnimatedCategoryWrapper key={category.id} layout={false}>
                       {renderCategoryCard(category, {
                         itemFilter: "unchecked",
                         sectionType: "toBuy",
@@ -187,6 +221,18 @@ export function ShoppingSections({
                 </AnimatePresence>
               </div>
             </SortableContext>
+            <DragOverlay dropAnimation={sortableDropAnimation}>
+              {draggingCategory ? (
+                <div
+                  className="overflow-hidden rounded-2xl bg-white px-4 py-3 shadow-lg ring-1 ring-[#E5E5EA]/80"
+                  style={{ borderLeft: `4px solid ${draggingCategory.color}` }}
+                >
+                  <p className="truncate text-lg font-semibold text-[#1C1C1E]">
+                    {draggingCategory.name}
+                  </p>
+                </div>
+              ) : null}
+            </DragOverlay>
           </DndContext>
         )}
       </section>

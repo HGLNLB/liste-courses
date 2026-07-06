@@ -3,11 +3,12 @@
 import { useMemo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { motion } from "framer-motion";
 import { Checkbox } from "./Checkbox";
 import { useSwipeDelete } from "@/hooks/useSwipeDelete";
+import { mergeDragListeners } from "@/lib/dnd";
 import { formatItemLabel } from "@/lib/utils";
 import type { Item } from "@/lib/types";
-import { motion } from "framer-motion";
 
 type ItemRowProps = {
   item: Item;
@@ -64,31 +65,15 @@ export function ItemRow({
     disabled: !dragEnabled || isSwipeActive,
   });
 
-  const handleListeners = useMemo(() => {
-    if (!listeners || !dragEnabled) return {};
-
-    const wrap = (handler: ((event: React.SyntheticEvent) => void) | undefined) => {
-      if (!handler) return undefined;
-      return (event: React.SyntheticEvent) => {
-        handler(event);
-        event.stopPropagation();
-      };
-    };
-
-    return {
-      ...attributes,
-      ...listeners,
-      onPointerDown: wrap(listeners.onPointerDown as ((event: React.SyntheticEvent) => void) | undefined),
-      onTouchStart: wrap(listeners.onTouchStart as ((event: React.SyntheticEvent) => void) | undefined),
-      onMouseDown: wrap(listeners.onMouseDown as ((event: React.SyntheticEvent) => void) | undefined),
-      onKeyDown: wrap(listeners.onKeyDown as ((event: React.SyntheticEvent) => void) | undefined),
-    };
-  }, [attributes, dragEnabled, listeners]);
+  const rowDragListeners = useMemo(
+    () => (dragEnabled ? mergeDragListeners(listeners) : {}),
+    [dragEnabled, listeners],
+  );
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : item.is_checked ? 0.4 : 1,
+    transition: isDragging ? undefined : transition,
+    opacity: isDragging ? 0.45 : item.is_checked ? 0.4 : 1,
     zIndex: isDragging ? 10 : undefined,
   };
 
@@ -96,6 +81,7 @@ export function ItemRow({
     <div
       ref={setNodeRef}
       style={sortableStyle}
+      {...(dragEnabled ? attributes : {})}
       data-item-id={item.id}
       data-item-row
       className={`relative overflow-hidden select-none border-b border-[#F2F2F7] last:border-b-0 ${
@@ -114,56 +100,36 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className={`relative bg-inherit ${isSwipeActive ? "touch-none" : ""}`}
+        className={`relative bg-inherit ${isSwipeActive || isDragging ? "touch-none" : ""}`}
         {...(swipeEnabled && !isDragging ? captureHandlers : {})}
+        {...(dragEnabled ? rowDragListeners : {})}
       >
         <div className="relative flex items-center bg-inherit">
-          {dragEnabled ? (
-            <>
-              <div
-                data-drag-handle
-                className="flex shrink-0 touch-none cursor-grab px-2 active:cursor-grabbing"
-                {...handleListeners}
-              >
-                <DragHandle />
-              </div>
-              <div
-                role="button"
-                tabIndex={swipeBlocked ? -1 : 0}
-                aria-disabled={swipeBlocked}
-                onClick={() => {
-                  if (swipeBlocked || isDragging) return;
-                  onEdit();
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    if (swipeBlocked || isDragging) return;
-                    onEdit();
-                  }
-                }}
-                className={`min-w-0 flex-1 py-3 pr-2 text-left ${swipeBlocked ? "pointer-events-none" : ""}`}
-              >
-                <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
-                {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
-              </div>
-            </>
-          ) : (
-            <>
-              <DragHandle />
-              <button
-                type="button"
-                onClick={onEdit}
-                className="min-w-0 flex-1 py-3 pr-2 text-left"
-              >
-                <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
-                {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
-              </button>
-            </>
-          )}
+          <DragHandle />
+          <div
+            role="button"
+            tabIndex={swipeBlocked ? -1 : 0}
+            aria-disabled={swipeBlocked}
+            data-no-swipe
+            onClick={() => {
+              if (swipeBlocked || isDragging) return;
+              onEdit();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                if (swipeBlocked || isDragging) return;
+                onEdit();
+              }
+            }}
+            className={`min-w-0 flex-1 py-3 pr-2 text-left ${swipeBlocked ? "pointer-events-none" : ""}`}
+          >
+            <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
+            {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
+          </div>
 
           {showCheckbox && (
-            <div className="shrink-0 pr-4">
+            <div className="shrink-0 pr-4" data-no-swipe data-no-drag>
               <Checkbox
                 checked={item.is_checked}
                 onChange={onToggleChecked}
