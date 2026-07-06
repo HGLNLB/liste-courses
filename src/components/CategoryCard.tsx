@@ -74,7 +74,7 @@ export function CategoryCard({
 
   const itemSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 400, tolerance: 8 } }),
   );
 
   const categoryEditActive = editMode === "categories";
@@ -200,6 +200,7 @@ export function CategoryCard({
             sensors={itemSensors}
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            onDragStart={() => vibrate(20)}
             onDragEnd={handleItemDragEnd}
           >
             <SortableContext
@@ -211,7 +212,6 @@ export function CategoryCard({
                   editingItemId === item.id ? (
                     <motion.div
                       key={item.id}
-                      layout
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
@@ -232,7 +232,6 @@ export function CategoryCard({
                   ) : (
                     <motion.div
                       key={item.id}
-                      layout
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: "auto" }}
                       exit={{ opacity: 0, height: 0 }}
