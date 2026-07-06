@@ -76,6 +76,7 @@ export function CategoryCard({
   const [addingItem, setAddingItem] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
+  const [activeSwipeItemId, setActiveSwipeItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (addingItem || editingItemId) {
@@ -99,6 +100,7 @@ export function CategoryCard({
   });
 
   const handleItemDragStart = (event: DragStartEvent) => {
+    setActiveSwipeItemId(null);
     lockScroll();
     vibrate([30, 20, 30]);
     setDraggingItemId(String(event.active.id));
@@ -266,11 +268,19 @@ export function CategoryCard({
                       item={item}
                       dragEnabled={itemsInteractive}
                       swipeEnabled={itemsInteractive}
+                      swipeActive={activeSwipeItemId === item.id}
                       highlighted={highlightedItemId === item.id}
                       showCheckbox={editMode === "none"}
+                      onSwipeActivate={() => setActiveSwipeItemId(item.id)}
+                      onSwipeRelease={() => {
+                        setActiveSwipeItemId((current) => (current === item.id ? null : current));
+                      }}
                       onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
                       onEdit={() => setEditingItemId(item.id)}
-                      onDelete={() => onDeleteItem(item.id)}
+                      onDelete={() => {
+                        setActiveSwipeItemId(null);
+                        onDeleteItem(item.id);
+                      }}
                     />
                   ),
                 )}

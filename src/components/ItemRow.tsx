@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -13,8 +13,11 @@ type ItemRowProps = {
   item: Item;
   dragEnabled: boolean;
   swipeEnabled: boolean;
+  swipeActive: boolean;
   highlighted: boolean;
   showCheckbox: boolean;
+  onSwipeActivate: () => void;
+  onSwipeRelease: () => void;
   onToggleChecked: (checked: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -34,16 +37,26 @@ export function ItemRow({
   item,
   dragEnabled,
   swipeEnabled,
+  swipeActive,
   highlighted,
   showCheckbox,
+  onSwipeActivate,
+  onSwipeRelease,
   onToggleChecked,
   onEdit,
   onDelete,
 }: ItemRowProps) {
   const draggedRef = useRef(false);
 
+  const handleActivate = useCallback(() => {
+    onSwipeActivate();
+  }, [onSwipeActivate]);
+
   const { x, deleteOpacity, isSwipeActive, captureHandlers } = useSwipeDelete({
     enabled: swipeEnabled,
+    isActive: swipeActive,
+    onActivate: handleActivate,
+    onRelease: onSwipeRelease,
     onDelete,
   });
 
@@ -72,11 +85,7 @@ export function ItemRow({
   };
 
   return (
-    <div
-      className="relative overflow-hidden select-none"
-      data-item-row
-      {...(swipeEnabled && !isDragging ? captureHandlers : {})}
-    >
+    <div className="relative overflow-hidden select-none" data-item-row>
       {swipeEnabled && (
         <motion.div
           className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
@@ -90,6 +99,7 @@ export function ItemRow({
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
         className={`relative bg-white ${isSwipeActive || isDragging ? "touch-none" : ""}`}
+        {...(swipeEnabled && !isDragging ? captureHandlers : {})}
       >
         <div
           ref={setNodeRef}
@@ -101,8 +111,14 @@ export function ItemRow({
           {...attributes}
         >
           {dragEnabled ? (
-            <div className="flex min-w-0 flex-1 touch-manipulation" data-drag-zone {...listeners}>
-              <DragHandle />
+            <>
+              <div
+                data-drag-handle
+                className="shrink-0 touch-none"
+                {...listeners}
+              >
+                <DragHandle />
+              </div>
               <div
                 role="button"
                 tabIndex={0}
@@ -120,7 +136,7 @@ export function ItemRow({
                 <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
                 {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
               </div>
-            </div>
+            </>
           ) : (
             <>
               <DragHandle />
@@ -136,7 +152,7 @@ export function ItemRow({
           )}
 
           {showCheckbox && (
-            <div className="shrink-0 pr-4" data-swipe-zone>
+            <div className="shrink-0 pr-4">
               <Checkbox
                 checked={item.is_checked}
                 onChange={onToggleChecked}

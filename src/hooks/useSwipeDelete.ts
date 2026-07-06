@@ -8,17 +8,22 @@ import { vibrate } from "@/lib/utils";
 const REVEAL_OFFSET = 72;
 const DELETE_THRESHOLD = 140;
 const SWIPE_START_PX = 10;
-const DRAG_ZONE_SWIPE_PX = 22;
-const DRAG_HOLD_MS = 3000;
 
 type UseSwipeDeleteOptions = {
   enabled: boolean;
-  onDelete: () => void;
-  onEngage?: () => void;
+  isActive: boolean;
+  onActivate: () => void;
   onRelease?: () => void;
+  onDelete: () => void;
 };
 
-export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSwipeDeleteOptions) {
+export function useSwipeDelete({
+  enabled,
+  isActive,
+  onActivate,
+  onRelease,
+  onDelete,
+}: UseSwipeDeleteOptions) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [0, REVEAL_OFFSET], [0, 1]);
   const [revealed, setRevealed] = useState(false);
@@ -28,8 +33,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
   const scrollLockedRef = useRef(false);
   const gestureRef = useRef<"pending" | "swipe" | "vertical" | null>(null);
   const startRef = useRef({ x: 0, y: 0 });
-  const touchStartTimeRef = useRef(0);
-  const inDragZoneRef = useRef(false);
+  const touchClaimedRef = useRef(false);
 
   useEffect(() => {
     revealedRef.current = revealed;
@@ -42,25 +46,33 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
     }
   }, []);
 
-  useEffect(() => {
-    if (!enabled) {
-      setRevealed(false);
-      revealedRef.current = false;
-      setIsSwipeActive(false);
-      x.set(0);
-      gestureRef.current = null;
-      releaseScroll();
-    }
-  }, [enabled, releaseScroll, x]);
-
-  useEffect(() => () => releaseScroll(), [releaseScroll]);
-
   const snapTo = useCallback(
     (target: number) => {
       animate(x, target, { type: "spring", stiffness: 500, damping: 35 });
     },
     [x],
   );
+
+  const canSwipe = useCallback(
+    () => enabled && (isActive || touchClaimedRef.current),
+    [enabled, isActive],
+  );
+
+  useEffect(() => {
+    if (!enabled || !isActive) {
+      if (x.get() > 0 || revealedRef.current) {
+        snapTo(0);
+      }
+      setRevealed(false);
+      revealedRef.current = false;
+      setIsSwipeActive(false);
+      gestureRef.current = null;
+      touchClaimedRef.current = false;
+      releaseScroll();
+    }
+  }, [enabled, isActive, releaseScroll, snapTo, x]);
+
+  useEffect(() => () => releaseScroll(), [releaseScroll]);
 
   const completeDelete = useCallback(() => {
     if (isDeletingRef.current) return;
@@ -86,6 +98,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
           setRevealed(false);
           revealedRef.current = false;
           snapTo(0);
+          onRelease?.();
           return;
         }
         snapTo(REVEAL_OFFSET);
@@ -101,8 +114,9 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
       }
 
       snapTo(0);
+      onRelease?.();
     },
-    [enabled, snapTo, completeDelete],
+    [enabled, onRelease, snapTo, completeDelete],
   );
 
   const engageSwipe = useCallback(() => {
@@ -110,34 +124,18 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
       scrollLockedRef.current = true;
       lockScroll();
     }
-    onEngage?.();
     setIsSwipeActive(true);
-  }, [onEngage]);
-
-  const shouldDeferSwipeOnDragZone = useCallback((dx: number, dy: number) => {
-    const elapsed = Date.now() - touchStartTimeRef.current;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
-    const horizontalIntent = absDx >= DRAG_ZONE_SWIPE_PX && absDx > absDy * 1.4;
-
-    if (!inDragZoneRef.current) {
-      return absDx < SWIPE_START_PX && absDy < SWIPE_START_PX;
-    }
-
-    if (horizontalIntent) return false;
-    if (elapsed < DRAG_HOLD_MS + 100) return true;
-    return absDy > absDx;
   }, []);
 
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {
-      if (!enabled || gestureRef.current === "vertical") return false;
+      if (!canSwipe() || gestureRef.current === "vertical") return false;
 
       const dx = clientX - startRef.current.x;
       const dy = clientY - startRef.current.y;
 
       if (gestureRef.current === "pending") {
-        if (shouldDeferSwipeOnDragZone(dx, dy)) return false;
+        if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return false;
 
         if (Math.abs(dy) > Math.abs(dx) && !revealedRef.current) {
           gestureRef.current = "vertical";
@@ -158,7 +156,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
 
       return false;
     },
-    [enabled, engageSwipe, shouldDeferSwipeOnDragZone, x],
+    [canSwipe, engageSwipe, x],
   );
 
   const endGesture = useCallback(() => {
@@ -169,26 +167,29 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
     }
 
     gestureRef.current = null;
-    inDragZoneRef.current = false;
+    touchClaimedRef.current = false;
     setIsSwipeActive(false);
-    onRelease?.();
     releaseScroll();
-  }, [enabled, finishSwipe, onRelease, releaseScroll, x]);
+  }, [enabled, finishSwipe, releaseScroll, x]);
+
+  const isDragHandle = (target: EventTarget | null) =>
+    target instanceof HTMLElement && Boolean(target.closest("[data-drag-handle]"));
 
   const captureHandlers = {
     onTouchStartCapture: (event: React.TouchEvent) => {
-      if (!enabled) return;
+      if (!enabled || isDragHandle(event.target)) return;
+
       const touch = event.touches[0];
       if (!touch) return;
 
-      const target = event.target as HTMLElement;
-      inDragZoneRef.current = Boolean(target.closest("[data-drag-zone]"));
-      touchStartTimeRef.current = Date.now();
+      onActivate();
+      touchClaimedRef.current = true;
       gestureRef.current = "pending";
       startRef.current = { x: touch.clientX, y: touch.clientY };
     },
     onTouchMoveCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
+      if (gestureRef.current === null && isDragHandle(event.target)) return;
       const touch = event.touches[0];
       if (!touch) return;
 
@@ -201,6 +202,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
     },
     onTouchEndCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
+      if (gestureRef.current === null && isDragHandle(event.target)) return;
       if (gestureRef.current === "swipe") {
         event.stopPropagation();
         event.preventDefault();
@@ -209,6 +211,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
     },
     onTouchCancelCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
+      if (gestureRef.current === null && isDragHandle(event.target)) return;
       if (gestureRef.current === "swipe") {
         event.stopPropagation();
         event.preventDefault();
