@@ -1,7 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { animate, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
+import {
+  animate,
+  motion,
+  useMotionValue,
+  useMotionValueEvent,
+  useTransform,
+  type PanInfo,
+} from "framer-motion";
 import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
@@ -13,6 +20,7 @@ type SwipeableDeleteProps = {
   onSwipeOpenChange?: (open: boolean) => void;
   rounded?: boolean;
   roundedBottom?: boolean;
+  onOpacityChange?: (opacity: number) => void;
   children: React.ReactNode;
 };
 
@@ -22,6 +30,7 @@ export function SwipeableDelete({
   onSwipeOpenChange,
   rounded = false,
   roundedBottom = false,
+  onOpacityChange,
   children,
 }: SwipeableDeleteProps) {
   const x = useMotionValue(0);
@@ -54,8 +63,13 @@ export function SwipeableDelete({
       setIsDragging(false);
       x.set(0);
       notifyOpen(false);
+      onOpacityChange?.(1);
     }
-  }, [enabled, notifyOpen, x]);
+  }, [enabled, notifyOpen, onOpacityChange, x]);
+
+  useMotionValueEvent(slideOpacity, "change", (latest) => {
+    onOpacityChange?.(latest);
+  });
 
   const snapTo = useCallback(
     (target: number) => {
@@ -153,7 +167,9 @@ export function SwipeableDelete({
     .join(" ");
 
   return (
-    <div className={`relative overflow-hidden ${rounded ? "rounded-t-2xl" : ""} ${roundedBottom ? "rounded-b-2xl" : ""}`}>
+    <div
+      className={`relative overflow-hidden ${rounded ? "rounded-t-2xl" : ""} ${roundedBottom ? "rounded-b-2xl" : ""}`}
+    >
       <div
         className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
         aria-hidden="true"
@@ -166,7 +182,7 @@ export function SwipeableDelete({
         dragDirectionLock
         dragConstraints={{ left: 0, right: revealed ? 280 : REVEAL_OFFSET + 20 }}
         dragElastic={revealed ? 0.15 : 0.08}
-        style={{ x, opacity: slideOpacity }}
+        style={{ x }}
         onDragStart={handleDragStart}
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}

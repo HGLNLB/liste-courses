@@ -108,6 +108,7 @@ export function CategoryCard({
   const [categorySwipeOpen, setCategorySwipeOpen] = useState(false);
   const [itemSwipeOpenId, setItemSwipeOpenId] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [swipeDeleteOpacity, setSwipeDeleteOpacity] = useState(1);
   const categorySwipeBlockedRef = useRef(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -288,6 +289,12 @@ export function CategoryCard({
 
   const headerUsesSwipe = categorySwipeEnabled && !editingCategoryInline;
 
+  const sectionOpacity = headerUsesSwipe
+    ? swipeDeleteOpacity * (dimmed ? 0.7 : 1)
+    : dimmed
+      ? 0.7
+      : 1;
+
   const headerContent = (
     <div
       ref={categorySortableRef}
@@ -298,7 +305,6 @@ export function CategoryCard({
       } ${!headerUsesSwipe && !category.is_open ? "rounded-b-2xl" : ""} ${
         isCategoryDragging ? "touch-none cursor-grabbing shadow-md" : categoryHeaderListeners ? "cursor-grab" : ""
       }`}
-      style={{ borderLeft: `4px solid ${category.color}` }}
       data-category-header
       onClick={(event) => {
         if (categoryEditActive) {
@@ -367,6 +373,7 @@ export function CategoryCard({
         roundedBottom={!category.is_open}
         onDelete={onDeleteCategory}
         onSwipeOpenChange={handleCategorySwipeOpenChange}
+        onOpacityChange={setSwipeDeleteOpacity}
       >
         {headerContent}
       </SwipeableDelete>
@@ -378,7 +385,8 @@ export function CategoryCard({
     <section
       className={`overflow-hidden rounded-2xl shadow-sm ring-1 ring-[#E5E5EA]/80 ${
         wiggleCategories && categoryEditActive ? "animate-wiggle" : ""
-      } ${dimmed ? "opacity-70" : ""}`}
+      }`}
+      style={{ borderLeft: `4px solid ${category.color}`, opacity: sectionOpacity }}
       onClick={(event) => {
         if (categoryEditActive) {
           handleCategoryEditModeClick(event);
