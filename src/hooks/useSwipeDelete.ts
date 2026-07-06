@@ -17,13 +17,19 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [0, REVEAL_OFFSET], [0, 1]);
   const [revealed, setRevealed] = useState(false);
+  const revealedRef = useRef(false);
   const isDeletingRef = useRef(false);
   const gestureRef = useRef<"pending" | "swipe" | "vertical" | null>(null);
   const startRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    revealedRef.current = revealed;
+  }, [revealed]);
+
+  useEffect(() => {
     if (!enabled) {
       setRevealed(false);
+      revealedRef.current = false;
       x.set(0);
       gestureRef.current = null;
     }
@@ -51,13 +57,14 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
     (position: number) => {
       if (!enabled || isDeletingRef.current) return;
 
-      if (revealed) {
+      if (revealedRef.current) {
         if (position > DELETE_THRESHOLD) {
           completeDelete();
           return;
         }
-        if (position < REVEAL_OFFSET - 20) {
+        if (position < REVEAL_OFFSET - 16) {
           setRevealed(false);
+          revealedRef.current = false;
           snapTo(0);
           return;
         }
@@ -67,6 +74,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
 
       if (position > 40) {
         setRevealed(true);
+        revealedRef.current = true;
         vibrate(20);
         snapTo(REVEAL_OFFSET);
         return;
@@ -74,10 +82,8 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
 
       snapTo(0);
     },
-    [enabled, revealed, snapTo, completeDelete],
+    [enabled, snapTo, completeDelete],
   );
-
-  const isSwipeBlocking = useCallback(() => gestureRef.current === "swipe", []);
 
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {
@@ -97,15 +103,17 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
         }
       }
 
-      if (gestureRef.current === "swipe" && dx > 0) {
-        const base = revealed ? REVEAL_OFFSET : 0;
-        x.set(Math.min(base + dx, 300));
+      if (gestureRef.current === "swipe") {
+        const target = revealedRef.current
+          ? Math.max(0, Math.min(REVEAL_OFFSET + dx, 300))
+          : Math.max(0, Math.min(dx, 300));
+        x.set(target);
         return true;
       }
 
       return false;
     },
-    [enabled, revealed, x],
+    [enabled, x],
   );
 
   const captureHandlers = {
@@ -124,6 +132,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       const blocking = updateGesture(touch.clientX, touch.clientY);
       if (blocking || gestureRef.current === "swipe") {
         event.stopPropagation();
+        event.preventDefault();
       }
     },
     onTouchEndCapture: (event: React.TouchEvent) => {
@@ -147,7 +156,6 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
   return {
     x,
     deleteOpacity,
-    isSwipeBlocking,
     captureHandlers,
   };
 }

@@ -22,7 +22,7 @@ type ItemRowProps = {
 
 function DragHandle() {
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-2 py-3">
+    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-2 py-3 opacity-40">
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
@@ -72,7 +72,7 @@ export function ItemRow({
   };
 
   return (
-    <div className="relative overflow-hidden" data-item-row>
+    <div className="relative overflow-hidden select-none" data-item-row>
       {swipeEnabled && (
         <motion.div
           className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
@@ -99,31 +99,38 @@ export function ItemRow({
         >
           {dragEnabled ? (
             <div
-              role="button"
-              tabIndex={0}
-              aria-label="Déplacer l'élément"
-              className="touch-manipulation text-[#8E8E93]"
+              className="flex min-w-0 flex-1 touch-manipulation"
               {...listeners}
             >
               <DragHandle />
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (!draggedRef.current && !isDragging) onEdit();
+                }}
+                className="min-w-0 flex-1 py-3 pr-2 text-left"
+              >
+                <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
+                {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
+              </div>
             </div>
           ) : (
-            <DragHandle />
+            <>
+              <DragHandle />
+              <button
+                type="button"
+                onClick={onEdit}
+                className="min-w-0 flex-1 py-3 pr-2 text-left"
+              >
+                <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
+                {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
+              </button>
+            </>
           )}
 
-          <button
-            type="button"
-            onClick={() => {
-              if (!draggedRef.current && !isDragging) onEdit();
-            }}
-            className="min-w-0 flex-1 py-3 pr-2 text-left"
-          >
-            <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
-            {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
-          </button>
-
           {showCheckbox && (
-            <div className="pr-4">
+            <div className="shrink-0 pr-4">
               <Checkbox
                 checked={item.is_checked}
                 onChange={onToggleChecked}

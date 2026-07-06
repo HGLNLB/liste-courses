@@ -60,11 +60,12 @@ export function SwipeableDelete({
       const velocityX = info.velocity.x;
 
       if (revealed) {
-        if (offsetX > DELETE_THRESHOLD - REVEAL_OFFSET || velocityX > 400) {
+        const position = x.get();
+        if (position > DELETE_THRESHOLD || velocityX > 400) {
           handleDelete();
           return;
         }
-        if (offsetX < -20 || velocityX < -200) {
+        if (position < REVEAL_OFFSET - 16 || offsetX < -20 || velocityX < -200) {
           setRevealed(false);
           snapTo(0);
           return;

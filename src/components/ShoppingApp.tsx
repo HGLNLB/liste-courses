@@ -104,6 +104,7 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
   return (
     <div
       className="min-h-full bg-[#F2F2F7]"
+      data-shopping-app
       onClick={() => {
         if (editMode !== "none") exitEditMode();
       }}
