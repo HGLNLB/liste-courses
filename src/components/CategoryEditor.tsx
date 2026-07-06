@@ -24,6 +24,15 @@ export function CategoryEditor({
     <div className="rounded-2xl border border-[#E5E5EA] bg-white p-4 shadow-lg">
       <input
         autoFocus
+        type="text"
+        name="category-name"
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="words"
+        spellCheck={false}
+        inputMode="text"
+        data-1p-ignore
+        data-lpignore="true"
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder="Nom de la catégorie"

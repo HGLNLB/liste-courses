@@ -1,18 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { itemSearchText, normalizeText } from "@/lib/utils";
+import { Checkbox } from "./Checkbox";
+import { itemSearchText, normalizeText, formatItemLabel } from "@/lib/utils";
 import type { CategoryWithItems } from "@/lib/types";
-import { formatItemLabel } from "@/lib/utils";
 
 type SearchOverlayProps = {
   open: boolean;
   categories: CategoryWithItems[];
   onClose: () => void;
   onSelect: (itemId: string) => void;
+  onToggleItemChecked: (itemId: string, checked: boolean) => void;
 };
 
-export function SearchOverlay({ open, categories, onClose, onSelect }: SearchOverlayProps) {
+export function SearchOverlay({
+  open,
+  categories,
+  onClose,
+  onSelect,
+  onToggleItemChecked,
+}: SearchOverlayProps) {
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,9 +53,13 @@ export function SearchOverlay({ open, categories, onClose, onSelect }: SearchOve
           </svg>
           <input
             ref={inputRef}
+            type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Rechercher un élément…"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="w-full bg-transparent text-base outline-none"
           />
         </div>
@@ -65,26 +76,25 @@ export function SearchOverlay({ open, categories, onClose, onSelect }: SearchOve
         <ul className="space-y-2">
           {results.map(({ category, item }) => (
             <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  onSelect(item.id);
-                  onClose();
-                }}
-                className="flex w-full items-center justify-between rounded-xl bg-white px-4 py-3 text-left shadow-sm ring-1 ring-[#E5E5EA]/80"
-              >
-                <div>
-                  <p className="text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
-                  <p className="text-sm text-[#8E8E93]">{category.name}</p>
-                </div>
-                <span
-                  className={`text-xs font-medium ${
-                    item.is_checked ? "text-[#8E8E93]" : "text-[#FF9500]"
-                  }`}
+              <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-sm ring-1 ring-[#E5E5EA]/80">
+                <button
+                  type="button"
+                  onClick={() => onSelect(item.id)}
+                  className="min-w-0 flex-1 text-left"
                 >
-                  {item.is_checked ? "Coché" : "À acheter"}
-                </span>
-              </button>
+                  <p
+                    className={`text-base text-[#1C1C1E] ${item.is_checked ? "opacity-50" : ""}`}
+                  >
+                    {formatItemLabel(item)}
+                  </p>
+                  <p className="text-sm text-[#8E8E93]">{category.name}</p>
+                </button>
+                <Checkbox
+                  checked={item.is_checked}
+                  onChange={(checked) => onToggleItemChecked(item.id, checked)}
+                  ariaLabel={`Cocher ${item.name}`}
+                />
+              </div>
             </li>
           ))}
         </ul>

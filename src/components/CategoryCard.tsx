@@ -175,12 +175,19 @@ export function CategoryCard({
           </svg>
         </button>
 
-        <div
-          className="min-w-0 flex-1 text-left"
-          {...(!categoryEditActive ? categoryLongPress : {})}
-        >
-          <h2 className="truncate text-lg font-semibold text-[#1C1C1E]">{category.name}</h2>
-        </div>
+        {categoryEditActive ? (
+          <h2 className="min-w-0 flex-1 truncate text-left text-lg font-semibold text-[#1C1C1E]">
+            {category.name}
+          </h2>
+        ) : (
+          <button
+            type="button"
+            className="min-w-0 flex-1 text-left"
+            {...categoryLongPress}
+          >
+            <h2 className="truncate text-lg font-semibold text-[#1C1C1E]">{category.name}</h2>
+          </button>
+        )}
 
         {editMode === "none" && (
           <Checkbox

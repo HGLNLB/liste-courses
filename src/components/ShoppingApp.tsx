@@ -245,6 +245,7 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
         categories={categories}
         onClose={() => setSearchOpen(false)}
         onSelect={scrollToItem}
+        onToggleItemChecked={toggleItemChecked}
       />
     </div>
   );

@@ -16,6 +16,7 @@ import { SortableCategoryCard } from "./SortableCategoryCard";
 import { CategoryCard } from "./CategoryCard";
 import { CategoryEditor } from "./CategoryEditor";
 import { AnimatedCategoryWrapper } from "./AnimatedCategoryWrapper";
+import { SwipeableCategory } from "./SwipeableCategory";
 import { getNotNeededCategories, getToBuyCategories } from "@/lib/utils";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 import { CATEGORY_COLORS } from "@/lib/types";
@@ -121,11 +122,20 @@ export function ShoppingSections({
       onReorderItems: (orderedIds: string[]) => onReorderItems(category.id, orderedIds),
     };
 
-    if (options.sortable) {
-      return <SortableCategoryCard {...props} />;
-    }
+    const card = options.sortable ? (
+      <SortableCategoryCard {...props} />
+    ) : (
+      <CategoryCard {...props} />
+    );
 
-    return <CategoryCard {...props} />;
+    return (
+      <SwipeableCategory
+        enabled={editMode === "none"}
+        onDelete={() => onDeleteCategory(category.id)}
+      >
+        {card}
+      </SwipeableCategory>
+    );
   };
 
   return (
