@@ -20,6 +20,16 @@ type ItemRowProps = {
   onDelete: () => void;
 };
 
+function DragHandle() {
+  return (
+    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-2 py-3">
+      <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+      <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+      <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+    </div>
+  );
+}
+
 export function ItemRow({
   item,
   dragEnabled,
@@ -58,11 +68,11 @@ export function ItemRow({
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : item.is_checked ? 0.4 : 1,
+    opacity: isDragging ? 0.4 : item.is_checked ? 0.4 : 1,
   };
 
   return (
-    <div className="relative overflow-hidden">
+    <div className="relative overflow-hidden" data-item-row>
       {swipeEnabled && (
         <motion.div
           className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
@@ -75,44 +85,51 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className="relative"
+        className="relative bg-white"
         {...(swipeEnabled ? captureHandlers : {})}
       >
         <div
           ref={setNodeRef}
           style={sortableStyle}
           data-item-id={item.id}
-          className={`relative flex items-center gap-3 border-b border-[#F2F2F7] bg-white px-4 py-3 last:border-b-0 ${
-            highlighted ? "bg-[#FFF9C4]" : ""
-          } ${isDragging ? "z-10" : ""}`}
+          className={`relative flex items-center border-b border-[#F2F2F7] last:border-b-0 ${
+            highlighted ? "bg-[#FFF9C4]" : "bg-white"
+          }`}
           {...attributes}
-          {...(dragEnabled ? listeners : {})}
-          onClick={() => {
-            if (!draggedRef.current && !isDragging) onEdit();
-          }}
         >
-          {dragEnabled && (
+          {dragEnabled ? (
             <div
-              className="flex shrink-0 flex-col items-center justify-center gap-[3px] py-1 pr-1 opacity-30"
-              aria-hidden="true"
+              role="button"
+              tabIndex={0}
+              aria-label="Déplacer l'élément"
+              className="touch-manipulation text-[#8E8E93]"
+              {...listeners}
             >
-              <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
-              <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
-              <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+              <DragHandle />
             </div>
+          ) : (
+            <DragHandle />
           )}
 
-          <div className="min-w-0 flex-1 text-left">
+          <button
+            type="button"
+            onClick={() => {
+              if (!draggedRef.current && !isDragging) onEdit();
+            }}
+            className="min-w-0 flex-1 py-3 pr-2 text-left"
+          >
             <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
             {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
-          </div>
+          </button>
 
           {showCheckbox && (
-            <Checkbox
-              checked={item.is_checked}
-              onChange={onToggleChecked}
-              ariaLabel={`Cocher ${item.name}`}
-            />
+            <div className="pr-4">
+              <Checkbox
+                checked={item.is_checked}
+                onChange={onToggleChecked}
+                ariaLabel={`Cocher ${item.name}`}
+              />
+            </div>
           )}
         </div>
       </motion.div>

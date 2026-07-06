@@ -111,6 +111,7 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
   const captureHandlers = {
     onTouchStartCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
+      event.stopPropagation();
       const touch = event.touches[0];
       if (!touch) return;
       gestureRef.current = "pending";
@@ -121,19 +122,21 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       const touch = event.touches[0];
       if (!touch) return;
       const blocking = updateGesture(touch.clientX, touch.clientY);
-      if (blocking) {
+      if (blocking || gestureRef.current === "swipe") {
         event.stopPropagation();
       }
     },
-    onTouchEndCapture: () => {
+    onTouchEndCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
+      event.stopPropagation();
       if (gestureRef.current === "swipe") {
         finishSwipe(x.get());
       }
       gestureRef.current = null;
     },
-    onTouchCancelCapture: () => {
+    onTouchCancelCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
+      event.stopPropagation();
       if (gestureRef.current === "swipe") {
         finishSwipe(x.get());
       }
