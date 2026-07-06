@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   type DragEndEvent,
+  type DragStartEvent,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -15,13 +16,14 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
+import { AnimatePresence, motion } from "framer-motion";
 import { Checkbox } from "./Checkbox";
 import { ItemRow } from "./ItemRow";
 import { ItemEditor } from "./ItemEditor";
 import { AnimatedCollapse } from "./AnimatedCollapse";
 import { useLongPress } from "@/hooks/useLongPress";
-import { vibrate } from "@/lib/utils";
+import { formatItemLabel, vibrate } from "@/lib/utils";
 import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 
@@ -71,10 +73,11 @@ export function CategoryCard({
 }: CategoryCardProps) {
   const [addingItem, setAddingItem] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
   const itemSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 400, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
   );
 
   const categoryEditActive = editMode === "categories";
@@ -86,7 +89,13 @@ export function CategoryCard({
     return true;
   });
 
+  const handleItemDragStart = (event: DragStartEvent) => {
+    vibrate(20);
+    setDraggingItemId(String(event.active.id));
+  };
+
   const handleItemDragEnd = (event: DragEndEvent) => {
+    setDraggingItemId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -107,6 +116,8 @@ export function CategoryCard({
     const merged = [...reorderedVisible, ...hiddenItems];
     onReorderItems(merged.map((item) => item.id));
   };
+
+  const draggingItem = visibleItems.find((entry) => entry.id === draggingItemId);
 
   const categoryChecked =
     sectionType === "toBuy" ? false : sectionType === "notNeeded" ? true : category.is_checked;
@@ -199,8 +210,8 @@ export function CategoryCard({
           <DndContext
             sensors={itemSensors}
             collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-            onDragStart={() => vibrate(20)}
+            modifiers={[restrictToVerticalAxis]}
+            onDragStart={handleItemDragStart}
             onDragEnd={handleItemDragEnd}
           >
             <SortableContext
@@ -253,6 +264,13 @@ export function CategoryCard({
                 )}
               </AnimatePresence>
             </SortableContext>
+            <DragOverlay dropAnimation={null}>
+              {draggingItem ? (
+                <div className="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-lg ring-1 ring-[#E5E5EA]">
+                  <p className="text-base text-[#1C1C1E]">{formatItemLabel(draggingItem)}</p>
+                </div>
+              ) : null}
+            </DragOverlay>
           </DndContext>
 
           {itemsInteractive && showAddItem && (

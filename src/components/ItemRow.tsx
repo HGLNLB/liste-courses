@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "./Checkbox";
-import { mergePointerListeners, useSwipeDelete } from "@/hooks/useSwipeDelete";
+import { useSwipeDelete } from "@/hooks/useSwipeDelete";
 import { formatItemLabel } from "@/lib/utils";
 import type { Item } from "@/lib/types";
 
@@ -37,7 +37,7 @@ export function ItemRow({
     disabled: !dragEnabled,
   });
 
-  const { x, deleteOpacity, isSwipeBlocking, swipeHandlers } = useSwipeDelete({
+  const { x, deleteOpacity, captureHandlers } = useSwipeDelete({
     enabled: swipeEnabled,
     onDelete,
   });
@@ -50,24 +50,15 @@ export function ItemRow({
     if (draggedRef.current) {
       const timer = setTimeout(() => {
         draggedRef.current = false;
-      }, 80);
+      }, 100);
       return () => clearTimeout(timer);
     }
   }, [isDragging]);
 
-  const pointerListeners =
-    dragEnabled && swipeEnabled
-      ? mergePointerListeners(listeners, swipeHandlers, isSwipeBlocking)
-      : dragEnabled
-        ? listeners
-        : swipeEnabled
-          ? swipeHandlers
-          : undefined;
-
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: item.is_checked ? 0.4 : 1,
+    opacity: isDragging ? 0.5 : item.is_checked ? 0.4 : 1,
   };
 
   return (
@@ -82,20 +73,35 @@ export function ItemRow({
         </motion.div>
       )}
 
-      <motion.div style={{ x: swipeEnabled ? x : 0 }} className="relative">
+      <motion.div
+        style={{ x: swipeEnabled ? x : 0 }}
+        className="relative"
+        {...(swipeEnabled ? captureHandlers : {})}
+      >
         <div
           ref={setNodeRef}
           style={sortableStyle}
           data-item-id={item.id}
           className={`relative flex items-center gap-3 border-b border-[#F2F2F7] bg-white px-4 py-3 last:border-b-0 ${
             highlighted ? "bg-[#FFF9C4]" : ""
-          } ${isDragging ? "z-10 shadow-md" : ""} ${dragEnabled ? "touch-pan-y" : ""}`}
+          } ${isDragging ? "z-10" : ""}`}
           {...attributes}
-          {...pointerListeners}
+          {...(dragEnabled ? listeners : {})}
           onClick={() => {
             if (!draggedRef.current && !isDragging) onEdit();
           }}
         >
+          {dragEnabled && (
+            <div
+              className="flex shrink-0 flex-col items-center justify-center gap-[3px] py-1 pr-1 opacity-30"
+              aria-hidden="true"
+            >
+              <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+              <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+              <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
+            </div>
+          )}
+
           <div className="min-w-0 flex-1 text-left">
             <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
             {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}

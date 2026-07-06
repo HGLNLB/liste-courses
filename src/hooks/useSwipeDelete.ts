@@ -79,90 +79,72 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
 
   const isSwipeBlocking = useCallback(() => gestureRef.current === "swipe", []);
 
-  const onSwipePointerDown = useCallback(
-    (event: React.PointerEvent) => {
-      if (!enabled) return;
-      gestureRef.current = "pending";
-      startRef.current = { x: event.clientX, y: event.clientY };
-    },
-    [enabled],
-  );
+  const updateGesture = useCallback(
+    (clientX: number, clientY: number) => {
+      if (!enabled || gestureRef.current === "vertical") return false;
 
-  const onSwipePointerMove = useCallback(
-    (event: React.PointerEvent) => {
-      if (!enabled || gestureRef.current === "vertical") return;
-
-      const dx = event.clientX - startRef.current.x;
-      const dy = event.clientY - startRef.current.y;
+      const dx = clientX - startRef.current.x;
+      const dy = clientY - startRef.current.y;
 
       if (gestureRef.current === "pending") {
-        if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) return;
+        if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) return false;
 
         if (Math.abs(dx) > Math.abs(dy)) {
           gestureRef.current = "swipe";
         } else {
           gestureRef.current = "vertical";
-          return;
+          return false;
         }
       }
 
       if (gestureRef.current === "swipe" && dx > 0) {
         const base = revealed ? REVEAL_OFFSET : 0;
         x.set(Math.min(base + dx, 300));
+        return true;
       }
+
+      return false;
     },
     [enabled, revealed, x],
   );
 
-  const onSwipePointerUp = useCallback(() => {
-    if (!enabled) return;
-
-    if (gestureRef.current === "swipe") {
-      finishSwipe(x.get());
-    }
-
-    gestureRef.current = null;
-  }, [enabled, finishSwipe, x]);
+  const captureHandlers = {
+    onTouchStartCapture: (event: React.TouchEvent) => {
+      if (!enabled) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      gestureRef.current = "pending";
+      startRef.current = { x: touch.clientX, y: touch.clientY };
+    },
+    onTouchMoveCapture: (event: React.TouchEvent) => {
+      if (!enabled) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      const blocking = updateGesture(touch.clientX, touch.clientY);
+      if (blocking) {
+        event.stopPropagation();
+      }
+    },
+    onTouchEndCapture: () => {
+      if (!enabled) return;
+      if (gestureRef.current === "swipe") {
+        finishSwipe(x.get());
+      }
+      gestureRef.current = null;
+    },
+    onTouchCancelCapture: () => {
+      if (!enabled) return;
+      if (gestureRef.current === "swipe") {
+        finishSwipe(x.get());
+      }
+      gestureRef.current = null;
+    },
+  };
 
   return {
     x,
     deleteOpacity,
     isSwipeBlocking,
-    swipeHandlers: {
-      onPointerDown: onSwipePointerDown,
-      onPointerMove: onSwipePointerMove,
-      onPointerUp: onSwipePointerUp,
-      onPointerCancel: onSwipePointerUp,
-    },
-  };
-}
-
-type PointerHandler = (event: React.PointerEvent) => void;
-
-export function mergePointerListeners(
-  sortableListeners: Record<string, Function> | undefined,
-  swipeHandlers: {
-    onPointerDown: PointerHandler;
-    onPointerMove: PointerHandler;
-    onPointerUp: PointerHandler;
-    onPointerCancel: PointerHandler;
-  },
-  isSwipeBlocking: () => boolean,
-) {
-  const chain = (key: keyof typeof swipeHandlers): PointerHandler => {
-    return (event) => {
-      swipeHandlers[key](event);
-      if ((key === "onPointerMove" || key === "onPointerUp" || key === "onPointerCancel") && isSwipeBlocking()) {
-        return;
-      }
-      sortableListeners?.[key]?.(event as React.PointerEvent);
-    };
-  };
-
-  return {
-    onPointerDown: chain("onPointerDown"),
-    onPointerMove: chain("onPointerMove"),
-    onPointerUp: chain("onPointerUp"),
-    onPointerCancel: chain("onPointerCancel"),
+    captureHandlers,
   };
 }
