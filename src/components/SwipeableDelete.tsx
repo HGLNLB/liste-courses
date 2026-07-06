@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
-import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
@@ -11,6 +10,7 @@ const DELETE_THRESHOLD = 140;
 type SwipeableDeleteProps = {
   enabled: boolean;
   onDelete: () => void;
+  onSwipeOpenChange?: (open: boolean) => void;
   rounded?: boolean;
   children: React.ReactNode;
 };
@@ -18,31 +18,28 @@ type SwipeableDeleteProps = {
 export function SwipeableDelete({
   enabled,
   onDelete,
+  onSwipeOpenChange,
   rounded = false,
   children,
 }: SwipeableDeleteProps) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [0, REVEAL_OFFSET], [0, 1]);
   const [revealed, setRevealed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const isDeletingRef = useRef(false);
-  const scrollLockedRef = useRef(false);
 
-  const releaseScroll = useCallback(() => {
-    if (scrollLockedRef.current) {
-      scrollLockedRef.current = false;
-      unlockScroll();
-    }
-  }, []);
+  useEffect(() => {
+    onSwipeOpenChange?.(revealed || isDragging || isDeletingRef.current);
+  }, [revealed, isDragging, onSwipeOpenChange]);
 
   useEffect(() => {
     if (!enabled) {
       setRevealed(false);
+      setIsDragging(false);
       x.set(0);
-      releaseScroll();
+      onSwipeOpenChange?.(false);
     }
-  }, [enabled, releaseScroll, x]);
-
-  useEffect(() => () => releaseScroll(), [releaseScroll]);
+  }, [enabled, onSwipeOpenChange, x]);
 
   const snapTo = useCallback(
     (target: number) => {
@@ -54,27 +51,28 @@ export function SwipeableDelete({
   const handleDelete = useCallback(() => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
+    onSwipeOpenChange?.(true);
     vibrate(30);
     animate(x, typeof window !== "undefined" ? window.innerWidth : 400, {
       duration: 0.28,
       ease: [0.4, 0, 1, 1],
       onComplete: () => {
-        releaseScroll();
+        isDeletingRef.current = false;
+        onSwipeOpenChange?.(false);
         onDelete();
       },
     });
-  }, [onDelete, releaseScroll, x]);
+  }, [onDelete, onSwipeOpenChange, x]);
 
   const handleDragStart = useCallback(() => {
-    if (!scrollLockedRef.current) {
-      scrollLockedRef.current = true;
-      lockScroll();
-    }
+    setIsDragging(true);
   }, []);
 
   const handleDragEnd = useCallback(
     (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
       if (!enabled || isDeletingRef.current) return;
+
+      setIsDragging(false);
 
       const offsetX = info.offset.x;
       const velocityX = info.velocity.x;
@@ -88,11 +86,9 @@ export function SwipeableDelete({
         if (position < REVEAL_OFFSET - 16 || offsetX < -20 || velocityX < -200) {
           setRevealed(false);
           snapTo(0);
-          releaseScroll();
           return;
         }
         snapTo(REVEAL_OFFSET);
-        releaseScroll();
         return;
       }
 
@@ -100,14 +96,12 @@ export function SwipeableDelete({
         setRevealed(true);
         vibrate(20);
         snapTo(REVEAL_OFFSET);
-        releaseScroll();
         return;
       }
 
       snapTo(0);
-      releaseScroll();
     },
-    [enabled, revealed, snapTo, handleDelete, releaseScroll, x],
+    [enabled, revealed, snapTo, handleDelete, x],
   );
 
   if (!enabled) {

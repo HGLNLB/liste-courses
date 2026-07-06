@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -25,7 +25,6 @@ import { AnimatedCollapse } from "./AnimatedCollapse";
 import { SwipeableDelete } from "./SwipeableDelete";
 import { useLongPress } from "@/hooks/useLongPress";
 import { formatItemLabel, vibrate } from "@/lib/utils";
-import { forceUnlockScroll, lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 
@@ -77,21 +76,24 @@ export function CategoryCard({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
   const [activeSwipeItemId, setActiveSwipeItemId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (addingItem || editingItemId) {
-      forceUnlockScroll();
-    }
-  }, [addingItem, editingItemId]);
+  const [categorySwipeOpen, setCategorySwipeOpen] = useState(false);
+  const [itemSwipeOpenId, setItemSwipeOpenId] = useState<string | null>(null);
 
   const categoryEditActive = editMode === "categories";
   const itemsInteractive = editMode === "none" && !categoryEditActive;
   const categorySwipeEnabled = editMode === "none" && !categoryEditActive;
 
   const itemSensors = useSensors(
-    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 24 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 30 } }),
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
   );
+
+  const handleItemSwipeOpenChange = useCallback((itemId: string, open: boolean) => {
+    setItemSwipeOpenId((current) => {
+      if (open) return itemId;
+      return current === itemId ? null : current;
+    });
+  }, []);
 
   const visibleItems = category.items.filter((item) => {
     if (itemFilter === "unchecked") return !item.is_checked;
@@ -101,13 +103,11 @@ export function CategoryCard({
 
   const handleItemDragStart = (event: DragStartEvent) => {
     setActiveSwipeItemId(null);
-    lockScroll();
     vibrate([30, 20, 30]);
     setDraggingItemId(String(event.active.id));
   };
 
   const handleItemDragEnd = (event: DragEndEvent) => {
-    unlockScroll();
     setDraggingItemId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -149,11 +149,15 @@ export function CategoryCard({
 
   const categoryLongPress = useLongPress({
     onLongPress: () => {
+      if (categorySwipeOpen) return;
       vibrate();
       onLongPressCategory();
     },
-    onClick: onEditCategory,
-    disabled: categoryEditActive,
+    onClick: () => {
+      if (categorySwipeOpen) return;
+      onEditCategory();
+    },
+    disabled: categoryEditActive || categorySwipeOpen,
   });
 
   return (
@@ -166,6 +170,7 @@ export function CategoryCard({
       <SwipeableDelete
         enabled={categorySwipeEnabled}
         onDelete={onDeleteCategory}
+        onSwipeOpenChange={setCategorySwipeOpen}
       >
         <div className="flex items-center gap-2 bg-white px-3 py-3 select-none" data-category-header>
           {categoryEditActive && (
@@ -224,7 +229,11 @@ export function CategoryCard({
       </SwipeableDelete>
 
       <AnimatedCollapse open={category.is_open}>
-        <div className="border-t border-[#F2F2F7]">
+        <div
+          className="border-t border-[#F2F2F7]"
+          onPointerDown={(event) => event.stopPropagation()}
+          onTouchStart={(event) => event.stopPropagation()}
+        >
           <DndContext
             sensors={itemSensors}
             collisionDetection={closestCenter}
@@ -232,7 +241,6 @@ export function CategoryCard({
             onDragStart={handleItemDragStart}
             onDragEnd={handleItemDragEnd}
             onDragCancel={() => {
-              unlockScroll();
               setDraggingItemId(null);
             }}
           >
@@ -269,16 +277,22 @@ export function CategoryCard({
                       dragEnabled={itemsInteractive}
                       swipeEnabled={itemsInteractive}
                       swipeActive={activeSwipeItemId === item.id}
+                      swipeBlocked={itemSwipeOpenId === item.id}
                       highlighted={highlightedItemId === item.id}
                       showCheckbox={editMode === "none"}
                       onSwipeActivate={() => setActiveSwipeItemId(item.id)}
                       onSwipeRelease={() => {
                         setActiveSwipeItemId((current) => (current === item.id ? null : current));
                       }}
+                      onSwipeOpenChange={(open) => handleItemSwipeOpenChange(item.id, open)}
                       onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
-                      onEdit={() => setEditingItemId(item.id)}
+                      onEdit={() => {
+                        if (itemSwipeOpenId === item.id) return;
+                        setEditingItemId(item.id);
+                      }}
                       onDelete={() => {
                         setActiveSwipeItemId(null);
+                        setItemSwipeOpenId(null);
                         onDeleteItem(item.id);
                       }}
                     />

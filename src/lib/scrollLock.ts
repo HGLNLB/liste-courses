@@ -23,6 +23,15 @@ export function unlockScroll(): void {
 export function forceUnlockScroll(): void {
   if (typeof document === "undefined") return;
 
+  const fixedTop = document.body.style.top;
+  let scrollY = window.scrollY;
+  if (fixedTop) {
+    const parsed = parseInt(fixedTop, 10);
+    if (!Number.isNaN(parsed)) {
+      scrollY = Math.abs(parsed);
+    }
+  }
+
   lockCount = 0;
   document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
@@ -32,4 +41,6 @@ export function forceUnlockScroll(): void {
   document.body.style.left = "";
   document.body.style.right = "";
   document.body.style.width = "";
+
+  window.scrollTo(0, scrollY);
 }

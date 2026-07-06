@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { animate, useMotionValue, useTransform } from "framer-motion";
-import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
@@ -14,6 +13,7 @@ type UseSwipeDeleteOptions = {
   isActive: boolean;
   onActivate: () => void;
   onRelease?: () => void;
+  onSwipeOpenChange?: (open: boolean) => void;
   onDelete: () => void;
 };
 
@@ -22,6 +22,7 @@ export function useSwipeDelete({
   isActive,
   onActivate,
   onRelease,
+  onSwipeOpenChange,
   onDelete,
 }: UseSwipeDeleteOptions) {
   const x = useMotionValue(0);
@@ -30,7 +31,6 @@ export function useSwipeDelete({
   const [isSwipeActive, setIsSwipeActive] = useState(false);
   const revealedRef = useRef(false);
   const isDeletingRef = useRef(false);
-  const scrollLockedRef = useRef(false);
   const gestureRef = useRef<"pending" | "swipe" | "vertical" | null>(null);
   const startRef = useRef({ x: 0, y: 0 });
   const touchClaimedRef = useRef(false);
@@ -39,12 +39,9 @@ export function useSwipeDelete({
     revealedRef.current = revealed;
   }, [revealed]);
 
-  const releaseScroll = useCallback(() => {
-    if (scrollLockedRef.current) {
-      scrollLockedRef.current = false;
-      unlockScroll();
-    }
-  }, []);
+  useEffect(() => {
+    onSwipeOpenChange?.(revealed || isSwipeActive || isDeletingRef.current);
+  }, [revealed, isSwipeActive, onSwipeOpenChange]);
 
   const snapTo = useCallback(
     (target: number) => {
@@ -68,22 +65,24 @@ export function useSwipeDelete({
       setIsSwipeActive(false);
       gestureRef.current = null;
       touchClaimedRef.current = false;
-      releaseScroll();
     }
-  }, [enabled, isActive, releaseScroll, snapTo, x]);
-
-  useEffect(() => () => releaseScroll(), [releaseScroll]);
+  }, [enabled, isActive, snapTo, x]);
 
   const completeDelete = useCallback(() => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
+    onSwipeOpenChange?.(true);
     vibrate(30);
     animate(x, typeof window !== "undefined" ? window.innerWidth : 400, {
       duration: 0.28,
       ease: [0.4, 0, 1, 1],
-      onComplete: onDelete,
+      onComplete: () => {
+        isDeletingRef.current = false;
+        onSwipeOpenChange?.(false);
+        onDelete();
+      },
     });
-  }, [onDelete, x]);
+  }, [onDelete, onSwipeOpenChange, x]);
 
   const finishSwipe = useCallback(
     (position: number) => {
@@ -120,10 +119,6 @@ export function useSwipeDelete({
   );
 
   const engageSwipe = useCallback(() => {
-    if (!scrollLockedRef.current) {
-      scrollLockedRef.current = true;
-      lockScroll();
-    }
     setIsSwipeActive(true);
   }, []);
 
@@ -169,8 +164,7 @@ export function useSwipeDelete({
     gestureRef.current = null;
     touchClaimedRef.current = false;
     setIsSwipeActive(false);
-    releaseScroll();
-  }, [enabled, finishSwipe, releaseScroll, x]);
+  }, [enabled, finishSwipe, x]);
 
   const isDragHandle = (target: EventTarget | null) =>
     target instanceof HTMLElement && Boolean(target.closest("[data-drag-handle]"));

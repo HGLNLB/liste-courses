@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -14,10 +14,12 @@ type ItemRowProps = {
   dragEnabled: boolean;
   swipeEnabled: boolean;
   swipeActive: boolean;
+  swipeBlocked: boolean;
   highlighted: boolean;
   showCheckbox: boolean;
   onSwipeActivate: () => void;
   onSwipeRelease: () => void;
+  onSwipeOpenChange: (open: boolean) => void;
   onToggleChecked: (checked: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -25,7 +27,7 @@ type ItemRowProps = {
 
 function DragHandle() {
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-2 py-3 opacity-40">
+    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-1 py-3 opacity-40">
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
@@ -38,10 +40,12 @@ export function ItemRow({
   dragEnabled,
   swipeEnabled,
   swipeActive,
+  swipeBlocked,
   highlighted,
   showCheckbox,
   onSwipeActivate,
   onSwipeRelease,
+  onSwipeOpenChange,
   onToggleChecked,
   onEdit,
   onDelete,
@@ -57,6 +61,7 @@ export function ItemRow({
     isActive: swipeActive,
     onActivate: handleActivate,
     onRelease: onSwipeRelease,
+    onSwipeOpenChange,
     onDelete,
   });
 
@@ -64,6 +69,23 @@ export function ItemRow({
     id: item.id,
     disabled: !dragEnabled || isSwipeActive,
   });
+
+  const handleListeners = useMemo(() => {
+    if (!listeners) return {};
+
+    return {
+      ...attributes,
+      ...listeners,
+      onTouchStart: (event: React.TouchEvent) => {
+        listeners.onTouchStart?.(event);
+        event.stopPropagation();
+      },
+      onPointerDown: (event: React.PointerEvent) => {
+        listeners.onPointerDown?.(event);
+        event.stopPropagation();
+      },
+    };
+  }, [attributes, listeners]);
 
   useEffect(() => {
     if (isDragging) {
@@ -85,7 +107,15 @@ export function ItemRow({
   };
 
   return (
-    <div className="relative overflow-hidden select-none" data-item-row>
+    <div
+      ref={setNodeRef}
+      style={sortableStyle}
+      data-item-id={item.id}
+      data-item-row
+      className={`relative overflow-hidden select-none border-b border-[#F2F2F7] last:border-b-0 ${
+        highlighted ? "bg-[#FFF9C4]" : "bg-white"
+      } ${isDragging ? "z-10" : ""}`}
+    >
       {swipeEnabled && (
         <motion.div
           className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
@@ -98,40 +128,35 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className={`relative bg-white ${isSwipeActive || isDragging ? "touch-none" : ""}`}
+        className={`relative bg-inherit ${isSwipeActive || isDragging ? "touch-none" : ""}`}
         {...(swipeEnabled && !isDragging ? captureHandlers : {})}
       >
-        <div
-          ref={setNodeRef}
-          style={sortableStyle}
-          data-item-id={item.id}
-          className={`relative flex items-center border-b border-[#F2F2F7] last:border-b-0 ${
-            highlighted ? "bg-[#FFF9C4]" : "bg-white"
-          }`}
-          {...attributes}
-        >
+        <div className="relative flex items-center bg-inherit">
           {dragEnabled ? (
             <>
               <div
                 data-drag-handle
-                className="shrink-0 touch-none"
-                {...listeners}
+                className="flex shrink-0 touch-manipulation cursor-grab px-2 active:cursor-grabbing"
+                {...handleListeners}
               >
                 <DragHandle />
               </div>
               <div
                 role="button"
-                tabIndex={0}
+                tabIndex={swipeBlocked ? -1 : 0}
+                aria-disabled={swipeBlocked}
                 onClick={() => {
-                  if (!draggedRef.current && !isDragging) onEdit();
+                  if (swipeBlocked || draggedRef.current || isDragging) return;
+                  onEdit();
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    if (!draggedRef.current && !isDragging) onEdit();
+                    if (swipeBlocked || draggedRef.current || isDragging) return;
+                    onEdit();
                   }
                 }}
-                className="min-w-0 flex-1 py-3 pr-2 text-left"
+                className={`min-w-0 flex-1 py-3 pr-2 text-left ${swipeBlocked ? "pointer-events-none" : ""}`}
               >
                 <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
                 {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
