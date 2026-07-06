@@ -48,7 +48,7 @@ export function ItemRow({
   });
 
   const { x, deleteOpacity, captureHandlers } = useSwipeDelete({
-    enabled: swipeEnabled,
+    enabled: swipeEnabled && !isDragging,
     onDelete,
   });
 
@@ -99,7 +99,8 @@ export function ItemRow({
         >
           {dragEnabled ? (
             <div
-              className="flex min-w-0 flex-1 touch-manipulation"
+              className="flex min-w-0 flex-1 touch-none"
+              data-drag-zone
               {...listeners}
             >
               <DragHandle />

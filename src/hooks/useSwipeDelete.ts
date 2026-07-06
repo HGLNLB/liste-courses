@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { animate, useMotionValue, useTransform } from "framer-motion";
+import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
 const DELETE_THRESHOLD = 140;
 const SWIPE_LOCK_PX = 10;
+const LONG_PRESS_HINT_MS = 400;
 
 type UseSwipeDeleteOptions = {
   enabled: boolean;
@@ -19,12 +21,21 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
   const [revealed, setRevealed] = useState(false);
   const revealedRef = useRef(false);
   const isDeletingRef = useRef(false);
-  const gestureRef = useRef<"pending" | "swipe" | "vertical" | null>(null);
+  const scrollLockedRef = useRef(false);
+  const gestureRef = useRef<"pending" | "swipe" | "vertical" | "longpress" | null>(null);
   const startRef = useRef({ x: 0, y: 0 });
+  const touchStartTimeRef = useRef(0);
 
   useEffect(() => {
     revealedRef.current = revealed;
   }, [revealed]);
+
+  const releaseScroll = useCallback(() => {
+    if (scrollLockedRef.current) {
+      scrollLockedRef.current = false;
+      unlockScroll();
+    }
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
@@ -32,8 +43,11 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
       revealedRef.current = false;
       x.set(0);
       gestureRef.current = null;
+      releaseScroll();
     }
-  }, [enabled, x]);
+  }, [enabled, releaseScroll, x]);
+
+  useEffect(() => () => releaseScroll(), [releaseScroll]);
 
   const snapTo = useCallback(
     (target: number) => {
@@ -85,22 +99,43 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
     [enabled, snapTo, completeDelete],
   );
 
+  const engageSwipe = useCallback(() => {
+    if (!scrollLockedRef.current) {
+      scrollLockedRef.current = true;
+      lockScroll();
+    }
+  }, []);
+
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {
-      if (!enabled || gestureRef.current === "vertical") return false;
+      if (!enabled || gestureRef.current === "vertical" || gestureRef.current === "longpress") {
+        return false;
+      }
 
       const dx = clientX - startRef.current.x;
       const dy = clientY - startRef.current.y;
+      const elapsed = Date.now() - touchStartTimeRef.current;
 
       if (gestureRef.current === "pending") {
-        if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) return false;
+        if (Math.abs(dx) < SWIPE_LOCK_PX && Math.abs(dy) < SWIPE_LOCK_PX) {
+          if (elapsed >= LONG_PRESS_HINT_MS) {
+            gestureRef.current = "longpress";
+          }
+          return false;
+        }
 
-        if (Math.abs(dx) > Math.abs(dy)) {
-          gestureRef.current = "swipe";
-        } else {
+        if (Math.abs(dy) > Math.abs(dx)) {
           gestureRef.current = "vertical";
           return false;
         }
+
+        if (elapsed >= LONG_PRESS_HINT_MS && Math.abs(dx) < 25) {
+          gestureRef.current = "longpress";
+          return false;
+        }
+
+        gestureRef.current = "swipe";
+        engageSwipe();
       }
 
       if (gestureRef.current === "swipe") {
@@ -113,43 +148,54 @@ export function useSwipeDelete({ enabled, onDelete }: UseSwipeDeleteOptions) {
 
       return false;
     },
-    [enabled, x],
+    [enabled, engageSwipe, x],
   );
+
+  const endGesture = useCallback(() => {
+    if (!enabled) return;
+
+    if (gestureRef.current === "swipe") {
+      finishSwipe(x.get());
+    }
+
+    gestureRef.current = null;
+    releaseScroll();
+  }, [enabled, finishSwipe, releaseScroll, x]);
 
   const captureHandlers = {
     onTouchStartCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
-      event.stopPropagation();
       const touch = event.touches[0];
       if (!touch) return;
       gestureRef.current = "pending";
+      touchStartTimeRef.current = Date.now();
       startRef.current = { x: touch.clientX, y: touch.clientY };
     },
     onTouchMoveCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
       const touch = event.touches[0];
       if (!touch) return;
-      const blocking = updateGesture(touch.clientX, touch.clientY);
-      if (blocking || gestureRef.current === "swipe") {
+
+      const isSwipe = updateGesture(touch.clientX, touch.clientY);
+
+      if (isSwipe) {
         event.stopPropagation();
         event.preventDefault();
       }
     },
     onTouchEndCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
-      event.stopPropagation();
       if (gestureRef.current === "swipe") {
-        finishSwipe(x.get());
+        event.stopPropagation();
       }
-      gestureRef.current = null;
+      endGesture();
     },
     onTouchCancelCapture: (event: React.TouchEvent) => {
       if (!enabled) return;
-      event.stopPropagation();
       if (gestureRef.current === "swipe") {
-        finishSwipe(x.get());
+        event.stopPropagation();
       }
-      gestureRef.current = null;
+      endGesture();
     },
   };
 

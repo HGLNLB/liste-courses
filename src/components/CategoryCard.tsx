@@ -25,6 +25,7 @@ import { AnimatedCollapse } from "./AnimatedCollapse";
 import { SwipeableDelete } from "./SwipeableDelete";
 import { useLongPress } from "@/hooks/useLongPress";
 import { formatItemLabel, vibrate } from "@/lib/utils";
+import { lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 
@@ -81,8 +82,8 @@ export function CategoryCard({
   const categorySwipeEnabled = editMode === "none" && !categoryEditActive;
 
   const itemSensors = useSensors(
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 6 } }),
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 10 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
   const visibleItems = category.items.filter((item) => {
@@ -92,11 +93,13 @@ export function CategoryCard({
   });
 
   const handleItemDragStart = (event: DragStartEvent) => {
-    vibrate(20);
+    lockScroll();
+    vibrate([30, 20, 30]);
     setDraggingItemId(String(event.active.id));
   };
 
   const handleItemDragEnd = (event: DragEndEvent) => {
+    unlockScroll();
     setDraggingItemId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -220,6 +223,10 @@ export function CategoryCard({
             modifiers={[restrictToVerticalAxis]}
             onDragStart={handleItemDragStart}
             onDragEnd={handleItemDragEnd}
+            onDragCancel={() => {
+              unlockScroll();
+              setDraggingItemId(null);
+            }}
           >
             <SortableContext
               items={visibleItems.map((item) => item.id)}
