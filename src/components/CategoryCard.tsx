@@ -29,7 +29,6 @@ type CategoryCardProps = {
   category: CategoryWithItems;
   editMode: EditMode;
   wiggleCategories: boolean;
-  wiggleItems: boolean;
   highlightedItemId: string | null;
   itemFilter?: "all" | "unchecked" | "checked";
   sectionType?: "toBuy" | "notNeeded";
@@ -47,7 +46,6 @@ type CategoryCardProps = {
   ) => void;
   onDeleteItem: (id: string) => void;
   onToggleItemChecked: (id: string, checked: boolean) => void;
-  onLongPressItem: () => void;
   onReorderItems: (orderedIds: string[]) => void;
 };
 
@@ -55,7 +53,6 @@ export function CategoryCard({
   category,
   editMode,
   wiggleCategories,
-  wiggleItems,
   highlightedItemId,
   itemFilter = "all",
   sectionType,
@@ -70,19 +67,18 @@ export function CategoryCard({
   onUpdateItem,
   onDeleteItem,
   onToggleItemChecked,
-  onLongPressItem,
   onReorderItems,
 }: CategoryCardProps) {
   const [addingItem, setAddingItem] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const itemSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 6 } }),
   );
 
   const categoryEditActive = editMode === "categories";
-  const itemEditActive = editMode === "items";
+  const itemsInteractive = editMode === "none" && !categoryEditActive;
 
   const visibleItems = category.items.filter((item) => {
     if (itemFilter === "unchecked") return !item.is_checked;
@@ -245,12 +241,11 @@ export function CategoryCard({
                     >
                       <ItemRow
                         item={item}
-                        editMode={itemEditActive}
-                        wiggle={wiggleItems && itemEditActive}
+                        dragEnabled={itemsInteractive}
+                        swipeEnabled={itemsInteractive}
                         highlighted={highlightedItemId === item.id}
                         showCheckbox={editMode === "none"}
                         onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
-                        onLongPress={onLongPressItem}
                         onEdit={() => setEditingItemId(item.id)}
                         onDelete={() => onDeleteItem(item.id)}
                       />
@@ -261,7 +256,7 @@ export function CategoryCard({
             </SortableContext>
           </DndContext>
 
-          {!itemEditActive && !categoryEditActive && showAddItem && (
+          {itemsInteractive && showAddItem && (
             <div className="px-3 py-2">
               {addingItem ? (
                 <ItemEditor

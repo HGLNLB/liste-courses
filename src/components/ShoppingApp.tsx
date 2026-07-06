@@ -37,7 +37,6 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
 
   const [editMode, setEditMode] = useState<EditMode>("none");
   const [wiggleCategories, setWiggleCategories] = useState(false);
-  const [wiggleItems, setWiggleItems] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
@@ -59,21 +58,12 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
   const exitEditMode = useCallback(() => {
     setEditMode("none");
     setWiggleCategories(false);
-    setWiggleItems(false);
   }, []);
 
   const enterCategoryEditMode = useCallback(() => {
     vibrate([30, 30, 30]);
     setEditMode("categories");
     setWiggleCategories(true);
-    setWiggleItems(false);
-  }, []);
-
-  const enterItemEditMode = useCallback(() => {
-    vibrate([30, 30, 30]);
-    setEditMode("items");
-    setWiggleItems(true);
-    setWiggleCategories(false);
   }, []);
 
   const handleCategoryDragEnd = (event: DragEndEvent) => {
@@ -196,7 +186,6 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             categories={categories}
             editMode={editMode}
             wiggleCategories={wiggleCategories}
-            wiggleItems={wiggleItems}
             highlightedItemId={highlightedItemId}
             creatingCategory={creatingCategory}
             editingCategoryId={editingCategoryId}
@@ -222,7 +211,6 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             onUpdateItem={updateItem}
             onDeleteItem={deleteItem}
             onToggleItemChecked={toggleItemChecked}
-            onLongPressItem={enterItemEditMode}
             onReorderItems={reorderItems}
           />
         )}

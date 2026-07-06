@@ -25,7 +25,6 @@ type ShoppingSectionsProps = {
   categories: CategoryWithItems[];
   editMode: EditMode;
   wiggleCategories: boolean;
-  wiggleItems: boolean;
   highlightedItemId: string | null;
   creatingCategory: boolean;
   editingCategoryId: string | null;
@@ -50,7 +49,6 @@ type ShoppingSectionsProps = {
   ) => void;
   onDeleteItem: (id: string) => void;
   onToggleItemChecked: (id: string, checked: boolean) => void;
-  onLongPressItem: () => void;
   onReorderItems: (categoryId: string, orderedIds: string[]) => void;
 };
 
@@ -58,7 +56,6 @@ export function ShoppingSections({
   categories,
   editMode,
   wiggleCategories,
-  wiggleItems,
   highlightedItemId,
   creatingCategory,
   editingCategoryId,
@@ -77,7 +74,6 @@ export function ShoppingSections({
   onUpdateItem,
   onDeleteItem,
   onToggleItemChecked,
-  onLongPressItem,
   onReorderItems,
 }: ShoppingSectionsProps) {
   const toBuyCategories = getToBuyCategories(categories);
@@ -102,7 +98,6 @@ export function ShoppingSections({
       category,
       editMode,
       wiggleCategories,
-      wiggleItems,
       highlightedItemId,
       itemFilter: options.itemFilter,
       sectionType: options.sectionType,
@@ -118,7 +113,6 @@ export function ShoppingSections({
       onUpdateItem,
       onDeleteItem,
       onToggleItemChecked,
-      onLongPressItem,
       onReorderItems: (orderedIds: string[]) => onReorderItems(category.id, orderedIds),
     };
 

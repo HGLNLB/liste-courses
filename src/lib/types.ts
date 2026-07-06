@@ -28,7 +28,7 @@ export type CategoryWithItems = Category & {
   items: Item[];
 };
 
-export type EditMode = "none" | "categories" | "items";
+export type EditMode = "none" | "categories";
 
 export const CATEGORY_COLORS = [
   { name: "Jaune", value: "#FFD60A" },
