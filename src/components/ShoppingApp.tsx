@@ -5,7 +5,6 @@ import { type DragEndEvent } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
 import { forceUnlockScroll } from "@/lib/scrollLock";
-import { CategoryEditor } from "./CategoryEditor";
 import { SearchOverlay } from "./SearchOverlay";
 import { ShoppingSections } from "./ShoppingSections";
 import { vibrate } from "@/lib/utils";
@@ -216,18 +215,6 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             onToggleItemChecked={toggleItemChecked}
             onReorderItems={reorderItems}
           />
-        )}
-
-        {creatingCategory && categories.length === 0 && (
-          <div className="mt-4 px-4">
-            <CategoryEditor
-              onCancel={() => setCreatingCategory(false)}
-              onSave={async (name, color) => {
-                await addCategory(name, color);
-                setCreatingCategory(false);
-              }}
-            />
-          </div>
         )}
       </main>
 

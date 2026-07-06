@@ -13,6 +13,7 @@ import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
 const DELETE_THRESHOLD = 140;
+const OPACITY_FADE_START = DELETE_THRESHOLD - 20;
 
 type SwipeableDeleteProps = {
   enabled: boolean;
@@ -34,7 +35,11 @@ export function SwipeableDelete({
   children,
 }: SwipeableDeleteProps) {
   const x = useMotionValue(0);
-  const slideOpacity = useTransform(x, [REVEAL_OFFSET, DELETE_THRESHOLD], [1, 0.2]);
+  const slideOpacity = useTransform(
+    x,
+    [REVEAL_OFFSET, OPACITY_FADE_START, DELETE_THRESHOLD],
+    [1, 1, 0.2],
+  );
   const [revealed, setRevealed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const isDeletingRef = useRef(false);
