@@ -34,7 +34,7 @@ export function SwipeableDelete({
   children,
 }: SwipeableDeleteProps) {
   const x = useMotionValue(0);
-  const slideOpacity = useTransform(x, [REVEAL_OFFSET, DELETE_THRESHOLD], [1, 0.9]);
+  const slideOpacity = useTransform(x, [REVEAL_OFFSET, DELETE_THRESHOLD], [1, 0.2]);
   const [revealed, setRevealed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const isDeletingRef = useRef(false);
