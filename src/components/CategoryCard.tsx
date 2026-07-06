@@ -42,6 +42,7 @@ type CategoryCardProps = {
   onUpdateCategory: (name: string, color: string) => void;
   onDeleteCategory: () => void;
   onLongPressCategory: () => void;
+  onDismissEditMode?: () => void;
   onToggleCategoryChecked: (checked: boolean) => void;
   onAddItem: (payload: { name: string; quantity?: string; unit?: string; notes?: string }) => void;
   onUpdateItem: (
@@ -87,6 +88,7 @@ export function CategoryCard({
   onUpdateCategory,
   onDeleteCategory,
   onLongPressCategory,
+  onDismissEditMode,
   onToggleCategoryChecked,
   onAddItem,
   onUpdateItem,
@@ -246,6 +248,12 @@ export function CategoryCard({
     setEditingCategoryInline(false);
   };
 
+  const handleCategoryEditModeClick = (event: React.MouseEvent) => {
+    if (!categoryEditActive || !onDismissEditMode) return;
+    if ((event.target as HTMLElement).closest("[data-category-delete-btn]")) return;
+    onDismissEditMode();
+  };
+
   const headerTitle = categoryEditActive ? (
     <h2 className="min-w-0 flex-1 truncate text-left text-lg font-semibold text-[#1C1C1E]">
       {category.name}
@@ -287,11 +295,18 @@ export function CategoryCard({
         isCategoryDragging ? "touch-none cursor-grabbing shadow-md" : categoryHeaderListeners ? "cursor-grab" : ""
       }`}
       data-category-header
-      onClick={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        if (categoryEditActive) {
+          handleCategoryEditModeClick(event);
+          return;
+        }
+        event.stopPropagation();
+      }}
     >
       {categoryEditActive && (
         <button
           type="button"
+          data-category-delete-btn
           aria-label="Supprimer la catégorie"
           onPointerDown={stopDragPointer}
           onTouchStart={stopDragPointer}
@@ -360,7 +375,13 @@ export function CategoryCard({
         wiggleCategories && categoryEditActive ? "animate-wiggle" : ""
       } ${dimmed ? "opacity-70" : ""}`}
       style={{ borderLeft: `4px solid ${category.color}` }}
-      onClick={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        if (categoryEditActive) {
+          handleCategoryEditModeClick(event);
+          return;
+        }
+        event.stopPropagation();
+      }}
     >
       {headerRow}
 

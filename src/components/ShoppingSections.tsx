@@ -35,6 +35,7 @@ type ShoppingSectionsProps = {
   onUpdateCategory: (id: string, name: string, color: string) => void;
   onDeleteCategory: (id: string) => void;
   onLongPressCategory: () => void;
+  onDismissEditMode: () => void;
   onToggleCategoryChecked: (id: string, checked: boolean) => void;
   onAddItem: (
     categoryId: string,
@@ -63,6 +64,7 @@ export function ShoppingSections({
   onUpdateCategory,
   onDeleteCategory,
   onLongPressCategory,
+  onDismissEditMode,
   onToggleCategoryChecked,
   onAddItem,
   onUpdateItem,
@@ -127,6 +129,7 @@ export function ShoppingSections({
       onUpdateCategory: (name: string, color: string) => onUpdateCategory(category.id, name, color),
       onDeleteCategory: () => onDeleteCategory(category.id),
       onLongPressCategory: handleLongPressCategory,
+      onDismissEditMode,
       onToggleCategoryChecked: (checked: boolean) => onToggleCategoryChecked(category.id, checked),
       onAddItem: (payload: { name: string; quantity?: string; unit?: string; notes?: string }) =>
         onAddItem(category.id, payload),

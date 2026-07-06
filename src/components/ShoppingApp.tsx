@@ -208,6 +208,7 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             }}
             onDeleteCategory={deleteCategory}
             onLongPressCategory={enterCategoryEditMode}
+            onDismissEditMode={handleBackgroundDismiss}
             onToggleCategoryChecked={setCategoryChecked}
             onAddItem={addItem}
             onUpdateItem={updateItem}
