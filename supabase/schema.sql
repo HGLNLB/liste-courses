@@ -57,3 +57,21 @@ create policy "items_update_own" on items
 
 create policy "items_delete_own" on items
   for delete using (auth.uid() = user_id);
+
+-- Synchronisation temps réel entre appareils (Supabase Realtime)
+alter table categories replica identity full;
+alter table items replica identity full;
+
+do $$
+begin
+  alter publication supabase_realtime add table categories;
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table items;
+exception
+  when duplicate_object then null;
+end $$;

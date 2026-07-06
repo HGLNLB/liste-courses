@@ -126,6 +126,12 @@ export function CategoryCard({
   }, [category.name, category.color, editingCategoryInline]);
 
   useEffect(() => {
+    if (!categoryEditActive) {
+      setEditingCategoryInline(false);
+    }
+  }, [categoryEditActive]);
+
+  useEffect(() => {
     if (editingCategoryInline) {
       titleInputRef.current?.focus();
     }
@@ -251,49 +257,56 @@ export function CategoryCard({
 
   const handleCategoryEditModeClick = (event: React.MouseEvent) => {
     if (!categoryEditActive || !onDismissEditMode) return;
-    if ((event.target as HTMLElement).closest("[data-category-delete-btn]")) return;
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-category-delete-btn]")) return;
+    if (target.closest("[data-category-title]")) return;
+    if (target.closest("[data-category-inline-edit]")) return;
     onDismissEditMode();
   };
 
   const headerTitle = categoryEditActive ? (
+    editingCategoryInline ? (
+      <input
+        ref={titleInputRef}
+        type="text"
+        name="shopping-category-title"
+        autoComplete="off"
+        autoCorrect="on"
+        autoCapitalize="sentences"
+        spellCheck
+        inputMode="text"
+        enterKeyHint="done"
+        data-1p-ignore
+        data-lpignore="true"
+        data-category-inline-edit
+        value={editName}
+        onChange={(event) => setEditName(event.target.value)}
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Enter") saveCategoryInline();
+          if (event.key === "Escape") cancelCategoryInline();
+        }}
+        onClick={(event) => event.stopPropagation()}
+        className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-[#1C1C1E] outline-none ring-0"
+        aria-label="Modifier la catégorie"
+      />
+    ) : (
+      <button
+        type="button"
+        data-category-title
+        onClick={(event) => {
+          event.stopPropagation();
+          setEditingCategoryInline(true);
+        }}
+        className="min-w-0 flex-1 text-left"
+      >
+        <h2 className="truncate text-lg font-semibold text-[#1C1C1E]">{category.name}</h2>
+      </button>
+    )
+  ) : (
     <h2 className="min-w-0 flex-1 truncate text-left text-lg font-semibold text-[#1C1C1E]">
       {category.name}
     </h2>
-  ) : editingCategoryInline ? (
-    <input
-      ref={titleInputRef}
-      type="text"
-      name="shopping-category-title"
-      autoComplete="off"
-      autoCorrect="on"
-      autoCapitalize="sentences"
-      spellCheck
-      inputMode="text"
-      enterKeyHint="done"
-      data-1p-ignore
-      data-lpignore="true"
-      value={editName}
-      onChange={(event) => setEditName(event.target.value)}
-      onKeyDown={(event) => {
-        event.stopPropagation();
-        if (event.key === "Enter") saveCategoryInline();
-        if (event.key === "Escape") cancelCategoryInline();
-      }}
-      onClick={(event) => event.stopPropagation()}
-      className="min-w-0 flex-1 bg-transparent text-lg font-semibold text-[#1C1C1E] outline-none ring-0"
-      aria-label="Modifier la catégorie"
-    />
-  ) : (
-    <button
-      type="button"
-      onClick={() => {
-        if (categorySwipeOpen || isCategoryDragging) return;
-        setEditingCategoryInline(true);
-      }}
-      className={`min-w-0 flex-1 text-left ${categorySwipeOpen ? "pointer-events-none" : ""}`}
-    >
-      <h2 className="truncate text-lg font-semibold text-[#1C1C1E]">{category.name}</h2>
-    </button>
   );
 
   const headerUsesSwipe = categorySwipeEnabled && !editingCategoryInline;
@@ -406,9 +419,10 @@ export function CategoryCard({
     >
       {headerRow}
 
-      {editingCategoryInline && (
+      {categoryEditActive && editingCategoryInline && (
         <div
           className="flex items-center justify-between gap-3 border-b border-[#F2F2F7] bg-white px-3 py-2"
+          data-category-inline-edit
           onClick={(event) => event.stopPropagation()}
         >
           <ColorPicker value={editColor} onChange={setEditColor} />
