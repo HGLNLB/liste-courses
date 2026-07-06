@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { animate, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
+import { animate, motion, useMotionValue, type PanInfo } from "framer-motion";
 import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
@@ -23,7 +23,6 @@ export function SwipeableDelete({
   children,
 }: SwipeableDeleteProps) {
   const x = useMotionValue(0);
-  const deleteOpacity = useTransform(x, [0, REVEAL_OFFSET], [0, 1]);
   const [revealed, setRevealed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const isDeletingRef = useRef(false);
@@ -139,14 +138,13 @@ export function SwipeableDelete({
   }
 
   return (
-    <div className={`relative overflow-hidden ${rounded ? "rounded-2xl" : ""}`}>
-      <motion.div
-        className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
-        style={{ opacity: deleteOpacity }}
+    <div className={`relative overflow-hidden ${rounded ? "rounded-t-2xl" : ""}`}>
+      <div
+        className="absolute inset-y-0 left-0 flex w-[72px] items-center bg-[#FF3B30] pl-5"
         aria-hidden="true"
       >
         <span className="text-2xl font-bold text-white">−</span>
-      </motion.div>
+      </div>
 
       <motion.div
         drag="x"
@@ -157,7 +155,7 @@ export function SwipeableDelete({
         onDragStart={handleDragStart}
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}
-        className="relative touch-none"
+        className="relative bg-white"
       >
         {children}
       </motion.div>

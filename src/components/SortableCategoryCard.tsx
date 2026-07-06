@@ -16,13 +16,15 @@ export function SortableCategoryCard(props: SortableCategoryCardProps) {
     transform: CSS.Transform.toString(transform),
     transition: isDragging ? undefined : transition,
     opacity: isDragging ? 0.45 : 1,
+    zIndex: isDragging ? 20 : undefined,
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div style={style}>
       <CategoryCard
         {...props}
         isCategoryDragging={isDragging}
+        categorySortableRef={setNodeRef}
         categoryHeaderAttributes={attributes}
         categoryHeaderListeners={listeners}
       />
