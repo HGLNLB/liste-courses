@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { animate, motion, useMotionValue, type PanInfo } from "framer-motion";
+import { animate, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
 import { vibrate } from "@/lib/utils";
 
 const REVEAL_OFFSET = 72;
@@ -12,6 +12,7 @@ type SwipeableDeleteProps = {
   onDelete: () => void;
   onSwipeOpenChange?: (open: boolean) => void;
   rounded?: boolean;
+  roundedBottom?: boolean;
   children: React.ReactNode;
 };
 
@@ -20,9 +21,11 @@ export function SwipeableDelete({
   onDelete,
   onSwipeOpenChange,
   rounded = false,
+  roundedBottom = false,
   children,
 }: SwipeableDeleteProps) {
   const x = useMotionValue(0);
+  const slideOpacity = useTransform(x, [REVEAL_OFFSET, DELETE_THRESHOLD], [1, 0.9]);
   const [revealed, setRevealed] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const isDeletingRef = useRef(false);
@@ -142,10 +145,17 @@ export function SwipeableDelete({
     return <>{children}</>;
   }
 
+  const roundedClasses = [
+    rounded ? "rounded-t-2xl" : "",
+    roundedBottom ? "rounded-b-2xl" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className={`relative overflow-hidden ${rounded ? "rounded-t-2xl" : ""}`}>
+    <div className={`relative overflow-hidden ${rounded ? "rounded-t-2xl" : ""} ${roundedBottom ? "rounded-b-2xl" : ""}`}>
       <div
-        className="absolute inset-y-0 left-0 flex w-[72px] items-center bg-[#FF3B30] pl-5"
+        className="absolute inset-0 flex items-center bg-[#FF3B30] pl-5"
         aria-hidden="true"
       >
         <span className="text-2xl font-bold text-white">−</span>
@@ -156,11 +166,11 @@ export function SwipeableDelete({
         dragDirectionLock
         dragConstraints={{ left: 0, right: revealed ? 280 : REVEAL_OFFSET + 20 }}
         dragElastic={revealed ? 0.15 : 0.08}
-        style={{ x }}
+        style={{ x, opacity: slideOpacity }}
         onDragStart={handleDragStart}
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}
-        className="relative bg-white"
+        className={`relative w-full min-w-full bg-white ${roundedClasses}`}
       >
         {children}
       </motion.div>

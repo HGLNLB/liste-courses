@@ -286,14 +286,19 @@ export function CategoryCard({
     </button>
   );
 
+  const headerUsesSwipe = categorySwipeEnabled && !editingCategoryInline;
+
   const headerContent = (
     <div
       ref={categorySortableRef}
       {...categoryHeaderAttributes}
       {...mergedHeaderListeners}
-      className={`flex items-center gap-2 px-3 py-3 select-none bg-white ${
+      className={`flex w-full min-w-full items-center gap-2 px-3 py-3 select-none ${
+        headerUsesSwipe ? "" : "rounded-t-2xl bg-white"
+      } ${!headerUsesSwipe && !category.is_open ? "rounded-b-2xl" : ""} ${
         isCategoryDragging ? "touch-none cursor-grabbing shadow-md" : categoryHeaderListeners ? "cursor-grab" : ""
       }`}
+      style={{ borderLeft: `4px solid ${category.color}` }}
       data-category-header
       onClick={(event) => {
         if (categoryEditActive) {
@@ -355,11 +360,11 @@ export function CategoryCard({
     </div>
   );
 
-  const headerRow =
-    categorySwipeEnabled && !editingCategoryInline ? (
+  const headerRow = headerUsesSwipe ? (
       <SwipeableDelete
         enabled={categorySwipeEnabled}
         rounded
+        roundedBottom={!category.is_open}
         onDelete={onDeleteCategory}
         onSwipeOpenChange={handleCategorySwipeOpenChange}
       >
@@ -371,10 +376,9 @@ export function CategoryCard({
 
   return (
     <section
-      className={`overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-[#E5E5EA]/80 ${
+      className={`overflow-hidden rounded-2xl shadow-sm ring-1 ring-[#E5E5EA]/80 ${
         wiggleCategories && categoryEditActive ? "animate-wiggle" : ""
       } ${dimmed ? "opacity-70" : ""}`}
-      style={{ borderLeft: `4px solid ${category.color}` }}
       onClick={(event) => {
         if (categoryEditActive) {
           handleCategoryEditModeClick(event);
