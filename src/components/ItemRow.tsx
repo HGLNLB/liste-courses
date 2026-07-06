@@ -28,7 +28,10 @@ type ItemRowProps = {
 
 function DragHandle() {
   return (
-    <div className="flex shrink-0 flex-col items-center justify-center gap-[3px] px-1 py-3 opacity-40">
+    <div
+      className="pointer-events-none flex shrink-0 flex-col items-center justify-center gap-[3px] px-1 py-3 opacity-40"
+      aria-hidden="true"
+    >
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
       <span className="block h-[3px] w-[3px] rounded-full bg-[#8E8E93]" />
@@ -82,11 +85,12 @@ export function ItemRow({
       ref={setNodeRef}
       style={sortableStyle}
       {...(dragEnabled ? attributes : {})}
+      {...(dragEnabled ? rowDragListeners : {})}
       data-item-id={item.id}
       data-item-row
       className={`relative overflow-hidden select-none border-b border-[#F2F2F7] last:border-b-0 ${
         highlighted ? "bg-[#FFF9C4]" : "bg-white"
-      }`}
+      } ${isDragging ? "touch-none" : ""}`}
     >
       {swipeEnabled && (
         <motion.div
@@ -100,9 +104,8 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className={`relative bg-inherit ${isSwipeActive || isDragging ? "touch-none" : ""}`}
+        className={`relative bg-inherit ${isSwipeActive ? "touch-none" : ""}`}
         {...(swipeEnabled && !isDragging ? captureHandlers : {})}
-        {...(dragEnabled ? rowDragListeners : {})}
       >
         <div className="relative flex items-center bg-inherit">
           <DragHandle />

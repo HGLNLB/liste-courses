@@ -14,9 +14,13 @@ export const sortableDropAnimation: DropAnimation = {
   }),
 };
 
-type DragListenerExtras = {
-  onPointerDown?: () => void;
-  onPointerUp?: () => void;
+export type DragListenerExtras = {
+  onPointerDown?: (event: React.PointerEvent) => void;
+  onPointerUp?: (event: React.PointerEvent) => void;
+  onPointerMove?: (event: React.PointerEvent) => void;
+  onTouchStart?: (event: React.TouchEvent) => void;
+  onTouchEnd?: (event: React.TouchEvent) => void;
+  onTouchMove?: (event: React.TouchEvent) => void;
 };
 
 type ListenerHandler = (event: unknown) => void;
@@ -34,16 +38,36 @@ export function mergeDragListeners(
   return {
     ...listeners,
     onPointerDown: (event: React.PointerEvent) => {
-      extra?.onPointerDown?.();
+      extra?.onPointerDown?.(event);
       call(listeners.onPointerDown as ListenerHandler | undefined, event);
     },
+    onPointerMove: (event: React.PointerEvent) => {
+      extra?.onPointerMove?.(event);
+      call(listeners.onPointerMove as ListenerHandler | undefined, event);
+    },
     onPointerUp: (event: React.PointerEvent) => {
-      extra?.onPointerUp?.();
+      extra?.onPointerUp?.(event);
       call(listeners.onPointerUp as ListenerHandler | undefined, event);
     },
     onPointerCancel: (event: React.PointerEvent) => {
-      extra?.onPointerUp?.();
+      extra?.onPointerUp?.(event);
       call(listeners.onPointerCancel as ListenerHandler | undefined, event);
+    },
+    onTouchStart: (event: React.TouchEvent) => {
+      extra?.onTouchStart?.(event);
+      call(listeners.onTouchStart as ListenerHandler | undefined, event);
+    },
+    onTouchMove: (event: React.TouchEvent) => {
+      extra?.onTouchMove?.(event);
+      call(listeners.onTouchMove as ListenerHandler | undefined, event);
+    },
+    onTouchEnd: (event: React.TouchEvent) => {
+      extra?.onTouchEnd?.(event);
+      call(listeners.onTouchEnd as ListenerHandler | undefined, event);
+    },
+    onTouchCancel: (event: React.TouchEvent) => {
+      extra?.onTouchEnd?.(event);
+      call(listeners.onTouchCancel as ListenerHandler | undefined, event);
     },
   };
 }

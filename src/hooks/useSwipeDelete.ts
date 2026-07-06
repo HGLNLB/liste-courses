@@ -12,6 +12,7 @@ const SWIPE_START_PX = 10;
 type UseSwipeDeleteOptions = {
   enabled: boolean;
   isActive: boolean;
+  dragHoldDelayMs?: number;
   onActivate: () => void;
   onRelease?: () => void;
   onSwipeOpenChange?: (open: boolean) => void;
@@ -21,6 +22,7 @@ type UseSwipeDeleteOptions = {
 export function useSwipeDelete({
   enabled,
   isActive,
+  dragHoldDelayMs = GESTURE.ITEM_DRAG_DELAY_MS,
   onActivate,
   onRelease,
   onSwipeOpenChange,
@@ -133,9 +135,9 @@ export function useSwipeDelete({
       absDx >= GESTURE.HORIZONTAL_SWIPE_PX && absDx > absDy * 1.4;
 
     if (horizontalIntent) return false;
-    if (elapsed < GESTURE.ITEM_DRAG_DELAY_MS + 50) return true;
+    if (elapsed < dragHoldDelayMs + 50) return true;
     return absDy > absDx;
-  }, []);
+  }, [dragHoldDelayMs]);
 
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {

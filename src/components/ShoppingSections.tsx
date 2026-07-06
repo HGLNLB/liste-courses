@@ -8,10 +8,6 @@ import {
   closestCenter,
   type DragEndEvent,
   type DragStartEvent,
-  MouseSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
@@ -21,9 +17,9 @@ import { CategoryEditor } from "./CategoryEditor";
 import { AnimatedCategoryWrapper } from "./AnimatedCategoryWrapper";
 import { GESTURE } from "@/lib/gestures";
 import { sortableDropAnimation } from "@/lib/dnd";
+import { useDragSensors } from "@/hooks/useDragSensors";
 import { getNotNeededCategories, getToBuyCategories, vibrate } from "@/lib/utils";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
-import { CATEGORY_COLORS } from "@/lib/types";
 
 type ShoppingSectionsProps = {
   categories: CategoryWithItems[];
@@ -31,15 +27,12 @@ type ShoppingSectionsProps = {
   wiggleCategories: boolean;
   highlightedItemId: string | null;
   creatingCategory: boolean;
-  editingCategoryId: string | null;
   onCreateCategory: () => void;
   onCancelCreateCategory: () => void;
   onSaveCategory: (name: string, color: string) => void;
-  onCancelEditCategory: () => void;
-  onSaveEditCategory: (name: string, color: string) => void;
   onCategoryDragEnd: (event: DragEndEvent) => void;
   onToggleOpen: (id: string) => void;
-  onEditCategory: (id: string) => void;
+  onUpdateCategory: (id: string, name: string, color: string) => void;
   onDeleteCategory: (id: string) => void;
   onLongPressCategory: () => void;
   onToggleCategoryChecked: (id: string, checked: boolean) => void;
@@ -62,15 +55,12 @@ export function ShoppingSections({
   wiggleCategories,
   highlightedItemId,
   creatingCategory,
-  editingCategoryId,
   onCreateCategory,
   onCancelCreateCategory,
   onSaveCategory,
-  onCancelEditCategory,
-  onSaveEditCategory,
   onCategoryDragEnd,
   onToggleOpen,
-  onEditCategory,
+  onUpdateCategory,
   onDeleteCategory,
   onLongPressCategory,
   onToggleCategoryChecked,
@@ -81,6 +71,7 @@ export function ShoppingSections({
   onReorderItems,
 }: ShoppingSectionsProps) {
   const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(null);
+  const [categoryDndKey, setCategoryDndKey] = useState(0);
 
   const toBuyCategories = getToBuyCategories(categories);
   const notNeededCategories = getNotNeededCategories(categories);
@@ -90,15 +81,7 @@ export function ShoppingSections({
       ? GESTURE.CATEGORY_DRAG_DELAY_EDIT_MS
       : GESTURE.CATEGORY_DRAG_DELAY_MS;
 
-  const categorySensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        delay: categoryDragDelay,
-        tolerance: GESTURE.MOVE_TOLERANCE_PX,
-      },
-    }),
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-  );
+  const categorySensors = useDragSensors(categoryDragDelay);
 
   const draggingCategory = useMemo(
     () => categories.find((category) => category.id === draggingCategoryId) ?? null,
@@ -113,6 +96,12 @@ export function ShoppingSections({
   const handleCategoryDragEnd = (event: DragEndEvent) => {
     onCategoryDragEnd(event);
     setDraggingCategoryId(null);
+  };
+
+  const handleLongPressCategory = () => {
+    setDraggingCategoryId(null);
+    setCategoryDndKey((key) => key + 1);
+    onLongPressCategory();
   };
 
   const renderCategoryCard = (
@@ -135,9 +124,9 @@ export function ShoppingSections({
       showAddItem: options.showAddItem,
       dimmed: options.dimmed,
       onToggleOpen: () => onToggleOpen(category.id),
-      onEditCategory: () => onEditCategory(category.id),
+      onUpdateCategory: (name: string, color: string) => onUpdateCategory(category.id, name, color),
       onDeleteCategory: () => onDeleteCategory(category.id),
-      onLongPressCategory,
+      onLongPressCategory: handleLongPressCategory,
       onToggleCategoryChecked: (checked: boolean) => onToggleCategoryChecked(category.id, checked),
       onAddItem: (payload: { name: string; quantity?: string; unit?: string; notes?: string }) =>
         onAddItem(category.id, payload),
@@ -158,17 +147,6 @@ export function ShoppingSections({
     <div className="space-y-6 px-4 pb-8">
       {creatingCategory && (
         <CategoryEditor onCancel={onCancelCreateCategory} onSave={onSaveCategory} />
-      )}
-
-      {editingCategoryId && (
-        <CategoryEditor
-          initialName={categories.find((c) => c.id === editingCategoryId)?.name}
-          initialColor={
-            categories.find((c) => c.id === editingCategoryId)?.color ?? CATEGORY_COLORS[0].value
-          }
-          onCancel={onCancelEditCategory}
-          onSave={onSaveEditCategory}
-        />
       )}
 
       <section>
@@ -194,6 +172,7 @@ export function ShoppingSections({
           </p>
         ) : (
           <DndContext
+            key={categoryDndKey}
             sensors={categorySensors}
             collisionDetection={closestCenter}
             modifiers={[restrictToVerticalAxis]}

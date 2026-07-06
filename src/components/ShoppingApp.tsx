@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { type DragEndEvent } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
@@ -41,8 +41,8 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
-  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
+  const ignoreBackgroundExitUntilRef = useRef(0);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -66,7 +66,13 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
     vibrate([30, 30, 30]);
     setEditMode("categories");
     setWiggleCategories(true);
+    ignoreBackgroundExitUntilRef.current = Date.now() + 600;
   }, []);
+
+  const handleBackgroundDismiss = useCallback(() => {
+    if (Date.now() < ignoreBackgroundExitUntilRef.current) return;
+    if (editMode !== "none") exitEditMode();
+  }, [editMode, exitEditMode]);
 
   const handleCategoryDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -107,9 +113,7 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
     <div
       className="min-h-full bg-[#F2F2F7]"
       data-shopping-app
-      onClick={() => {
-        if (editMode !== "none") exitEditMode();
-      }}
+      onClick={handleBackgroundDismiss}
     >
       <header className="safe-top sticky top-0 z-40 border-b border-[#E5E5EA] bg-[#F2F2F7]/90 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3">
@@ -191,22 +195,17 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             wiggleCategories={wiggleCategories}
             highlightedItemId={highlightedItemId}
             creatingCategory={creatingCategory}
-            editingCategoryId={editingCategoryId}
             onCreateCategory={() => setCreatingCategory(true)}
             onCancelCreateCategory={() => setCreatingCategory(false)}
             onSaveCategory={async (name, color) => {
               await addCategory(name, color);
               setCreatingCategory(false);
             }}
-            onCancelEditCategory={() => setEditingCategoryId(null)}
-            onSaveEditCategory={async (name, color) => {
-              if (!editingCategoryId) return;
-              await updateCategory(editingCategoryId, { name, color });
-              setEditingCategoryId(null);
-            }}
             onCategoryDragEnd={handleCategoryDragEnd}
             onToggleOpen={toggleCategoryOpen}
-            onEditCategory={setEditingCategoryId}
+            onUpdateCategory={async (id, name, color) => {
+              await updateCategory(id, { name, color });
+            }}
             onDeleteCategory={deleteCategory}
             onLongPressCategory={enterCategoryEditMode}
             onToggleCategoryChecked={setCategoryChecked}
