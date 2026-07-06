@@ -119,8 +119,9 @@ export function useSwipeDelete({
   );
 
   const engageSwipe = useCallback(() => {
+    onSwipeOpenChange?.(true);
     setIsSwipeActive(true);
-  }, []);
+  }, [onSwipeOpenChange]);
 
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {

@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { motion } from "framer-motion";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useCallback, useEffect, useRef } from "react";
+import { Reorder, useDragControls, motion } from "framer-motion";
 import { Checkbox } from "./Checkbox";
+import { useLongPress } from "@/hooks/useLongPress";
 import { useSwipeDelete } from "@/hooks/useSwipeDelete";
-import { formatItemLabel } from "@/lib/utils";
+import { formatItemLabel, vibrate } from "@/lib/utils";
 import type { Item } from "@/lib/types";
 
 type ItemRowProps = {
@@ -20,6 +19,8 @@ type ItemRowProps = {
   onSwipeActivate: () => void;
   onSwipeRelease: () => void;
   onSwipeOpenChange: (open: boolean) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
   onToggleChecked: (checked: boolean) => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -46,11 +47,14 @@ export function ItemRow({
   onSwipeActivate,
   onSwipeRelease,
   onSwipeOpenChange,
+  onDragStart,
+  onDragEnd,
   onToggleChecked,
   onEdit,
   onDelete,
 }: ItemRowProps) {
   const draggedRef = useRef(false);
+  const dragControls = useDragControls();
 
   const handleActivate = useCallback(() => {
     onSwipeActivate();
@@ -65,56 +69,43 @@ export function ItemRow({
     onDelete,
   });
 
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: !dragEnabled || isSwipeActive,
+  const handleLongPress = useLongPress({
+    delay: 3000,
+    moveTolerance: 20,
+    disabled: !dragEnabled || isSwipeActive || swipeBlocked,
+    onLongPress: (event) => {
+      vibrate([30, 20, 30]);
+      onDragStart?.();
+      dragControls.start(event as PointerEvent);
+    },
   });
 
-  const handleListeners = useMemo(() => {
-    if (!listeners) return {};
-
-    return {
-      ...attributes,
-      ...listeners,
-      onTouchStart: (event: React.TouchEvent) => {
-        listeners.onTouchStart?.(event);
-        event.stopPropagation();
-      },
-      onPointerDown: (event: React.PointerEvent) => {
-        listeners.onPointerDown?.(event);
-        event.stopPropagation();
-      },
-    };
-  }, [attributes, listeners]);
-
   useEffect(() => {
-    if (isDragging) {
-      draggedRef.current = true;
-      return;
+    if (!dragEnabled) {
+      draggedRef.current = false;
     }
-    if (draggedRef.current) {
-      const timer = setTimeout(() => {
-        draggedRef.current = false;
-      }, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [isDragging]);
-
-  const sortableStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : item.is_checked ? 0.4 : 1,
-  };
+  }, [dragEnabled]);
 
   return (
-    <div
-      ref={setNodeRef}
-      style={sortableStyle}
-      data-item-id={item.id}
-      data-item-row
+    <Reorder.Item
+      value={item}
+      dragListener={false}
+      dragControls={dragControls}
+      onDragStart={() => {
+        draggedRef.current = true;
+        onDragStart?.();
+      }}
+      onDragEnd={() => {
+        onDragEnd?.();
+        setTimeout(() => {
+          draggedRef.current = false;
+        }, 100);
+      }}
       className={`relative overflow-hidden select-none border-b border-[#F2F2F7] last:border-b-0 ${
         highlighted ? "bg-[#FFF9C4]" : "bg-white"
-      } ${isDragging ? "z-10" : ""}`}
+      }`}
+      data-item-id={item.id}
+      data-item-row
     >
       {swipeEnabled && (
         <motion.div
@@ -128,16 +119,29 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className={`relative bg-inherit ${isSwipeActive || isDragging ? "touch-none" : ""}`}
-        {...(swipeEnabled && !isDragging ? captureHandlers : {})}
+        className={`relative bg-inherit ${isSwipeActive ? "touch-none" : ""}`}
+        {...(swipeEnabled ? captureHandlers : {})}
       >
         <div className="relative flex items-center bg-inherit">
           {dragEnabled ? (
             <>
               <div
                 data-drag-handle
-                className="flex shrink-0 touch-manipulation cursor-grab px-2 active:cursor-grabbing"
-                {...handleListeners}
+                className="flex shrink-0 touch-none cursor-grab px-2 active:cursor-grabbing"
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  handleLongPress.onPointerDown?.(event);
+                }}
+                onPointerMove={handleLongPress.onPointerMove}
+                onPointerUp={handleLongPress.onPointerUp}
+                onPointerCancel={handleLongPress.onPointerCancel}
+                onTouchStart={(event) => {
+                  event.stopPropagation();
+                  handleLongPress.onTouchStart?.(event);
+                }}
+                onTouchMove={handleLongPress.onTouchMove}
+                onTouchEnd={handleLongPress.onTouchEnd}
+                onTouchCancel={handleLongPress.onTouchCancel}
               >
                 <DragHandle />
               </div>
@@ -146,13 +150,13 @@ export function ItemRow({
                 tabIndex={swipeBlocked ? -1 : 0}
                 aria-disabled={swipeBlocked}
                 onClick={() => {
-                  if (swipeBlocked || draggedRef.current || isDragging) return;
+                  if (swipeBlocked || draggedRef.current) return;
                   onEdit();
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
-                    if (swipeBlocked || draggedRef.current || isDragging) return;
+                    if (swipeBlocked || draggedRef.current) return;
                     onEdit();
                   }
                 }}
@@ -187,6 +191,6 @@ export function ItemRow({
           )}
         </div>
       </motion.div>
-    </div>
+    </Reorder.Item>
   );
 }
