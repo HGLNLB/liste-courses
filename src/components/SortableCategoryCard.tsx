@@ -1,31 +1,11 @@
 "use client";
 
+import type { ComponentProps } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { CategoryCard } from "./CategoryCard";
-import type { CategoryWithItems, EditMode } from "@/lib/types";
 
-type SortableCategoryCardProps = {
-  category: CategoryWithItems;
-  editMode: EditMode;
-  wiggleCategories: boolean;
-  wiggleItems: boolean;
-  highlightedItemId: string | null;
-  onToggleOpen: () => void;
-  onEditCategory: () => void;
-  onDeleteCategory: () => void;
-  onLongPressCategory: () => void;
-  onToggleCategoryChecked: (checked: boolean) => void;
-  onAddItem: (payload: { name: string; quantity?: string; unit?: string; notes?: string }) => void;
-  onUpdateItem: (
-    id: string,
-    payload: { name: string; quantity?: string; unit?: string; notes?: string },
-  ) => void;
-  onDeleteItem: (id: string) => void;
-  onToggleItemChecked: (id: string, checked: boolean) => void;
-  onLongPressItem: () => void;
-  onReorderItems: (orderedIds: string[]) => void;
-};
+type SortableCategoryCardProps = ComponentProps<typeof CategoryCard>;
 
 export function SortableCategoryCard(props: SortableCategoryCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   DndContext,
   closestCenter,
@@ -18,8 +19,10 @@ import { restrictToVerticalAxis, restrictToParentElement } from "@dnd-kit/modifi
 import { Checkbox } from "./Checkbox";
 import { ItemRow } from "./ItemRow";
 import { ItemEditor } from "./ItemEditor";
+import { AnimatedCollapse } from "./AnimatedCollapse";
 import { useLongPress } from "@/hooks/useLongPress";
 import { vibrate } from "@/lib/utils";
+import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 
 type CategoryCardProps = {
@@ -165,7 +168,7 @@ export function CategoryCard({
             width="12"
             height="12"
             viewBox="0 0 12 12"
-            className={`transition-transform ${category.is_open ? "rotate-90" : ""}`}
+            className={`transition-transform duration-200 ease-out ${category.is_open ? "rotate-90" : ""}`}
             aria-hidden="true"
           >
             <path d="M4 2L9 6L4 10" stroke="currentColor" strokeWidth="1.5" fill="none" />
@@ -188,7 +191,7 @@ export function CategoryCard({
         )}
       </div>
 
-      {category.is_open && (
+      <AnimatedCollapse open={category.is_open}>
         <div className="border-t border-[#F2F2F7]">
           <DndContext
             sensors={itemSensors}
@@ -200,33 +203,54 @@ export function CategoryCard({
               items={visibleItems.map((item) => item.id)}
               strategy={verticalListSortingStrategy}
             >
-              {visibleItems.map((item) =>
-                editingItemId === item.id ? (
-                  <div key={item.id} className="px-3 py-2">
-                    <ItemEditor
-                      initial={item}
-                      onCancel={() => setEditingItemId(null)}
-                      onSave={(payload) => {
-                        onUpdateItem(item.id, payload);
-                        setEditingItemId(null);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <ItemRow
-                    key={item.id}
-                    item={item}
-                    editMode={itemEditActive}
-                    wiggle={wiggleItems && itemEditActive}
-                    highlighted={highlightedItemId === item.id}
-                    showCheckbox={editMode === "none"}
-                    onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
-                    onLongPress={onLongPressItem}
-                    onEdit={() => setEditingItemId(item.id)}
-                    onDelete={() => onDeleteItem(item.id)}
-                  />
-                ),
-              )}
+              <AnimatePresence initial={false} mode="popLayout">
+                {visibleItems.map((item) =>
+                  editingItemId === item.id ? (
+                    <motion.div
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={listItemTransition}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-3 py-2">
+                        <ItemEditor
+                          initial={item}
+                          onCancel={() => setEditingItemId(null)}
+                          onSave={(payload) => {
+                            onUpdateItem(item.id, payload);
+                            setEditingItemId(null);
+                          }}
+                        />
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key={item.id}
+                      layout
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={listItemTransition}
+                      className="overflow-hidden"
+                    >
+                      <ItemRow
+                        item={item}
+                        editMode={itemEditActive}
+                        wiggle={wiggleItems && itemEditActive}
+                        highlighted={highlightedItemId === item.id}
+                        showCheckbox={editMode === "none"}
+                        onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
+                        onLongPress={onLongPressItem}
+                        onEdit={() => setEditingItemId(item.id)}
+                        onDelete={() => onDeleteItem(item.id)}
+                      />
+                    </motion.div>
+                  ),
+                )}
+              </AnimatePresence>
             </SortableContext>
           </DndContext>
 
@@ -252,7 +276,7 @@ export function CategoryCard({
             </div>
           )}
         </div>
-      )}
+      </AnimatedCollapse>
     </section>
   );
 }

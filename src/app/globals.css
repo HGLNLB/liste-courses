@@ -50,8 +50,8 @@ body {
   animation: wiggle 0.18s ease-in-out infinite;
 }
 
-input,
-textarea,
-button {
-  font-family: inherit;
+@media (prefers-reduced-motion: reduce) {
+  .animate-wiggle {
+    animation: none;
+  }
 }

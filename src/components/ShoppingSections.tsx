@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import {
   DndContext,
   closestCenter,
@@ -14,6 +15,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { SortableCategoryCard } from "./SortableCategoryCard";
 import { CategoryCard } from "./CategoryCard";
 import { CategoryEditor } from "./CategoryEditor";
+import { AnimatedCategoryWrapper } from "./AnimatedCategoryWrapper";
 import { getNotNeededCategories, getToBuyCategories } from "@/lib/utils";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 import { CATEGORY_COLORS } from "@/lib/types";
@@ -120,10 +122,10 @@ export function ShoppingSections({
     };
 
     if (options.sortable) {
-      return <SortableCategoryCard key={category.id} {...props} />;
+      return <SortableCategoryCard {...props} />;
     }
 
-    return <CategoryCard key={`${category.id}-${options.sectionType}`} {...props} />;
+    return <CategoryCard {...props} />;
   };
 
   return (
@@ -176,15 +178,19 @@ export function ShoppingSections({
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-3">
-                {toBuyCategories.map((category) =>
-                  renderCategoryCard(category, {
-                    itemFilter: "unchecked",
-                    sectionType: "toBuy",
-                    showAddItem: true,
-                    dimmed: false,
-                    sortable: true,
-                  }),
-                )}
+                <AnimatePresence initial={false} mode="popLayout">
+                  {toBuyCategories.map((category) => (
+                    <AnimatedCategoryWrapper key={category.id}>
+                      {renderCategoryCard(category, {
+                        itemFilter: "unchecked",
+                        sectionType: "toBuy",
+                        showAddItem: true,
+                        dimmed: false,
+                        sortable: true,
+                      })}
+                    </AnimatedCategoryWrapper>
+                  ))}
+                </AnimatePresence>
               </div>
             </SortableContext>
           </DndContext>
@@ -202,15 +208,19 @@ export function ShoppingSections({
           </p>
         ) : (
           <div className="space-y-3">
-            {notNeededCategories.map((category) =>
-              renderCategoryCard(category, {
-                itemFilter: "checked",
-                sectionType: "notNeeded",
-                showAddItem: false,
-                dimmed: true,
-                sortable: false,
-              }),
-            )}
+            <AnimatePresence initial={false} mode="popLayout">
+              {notNeededCategories.map((category) => (
+                <AnimatedCategoryWrapper key={`${category.id}-notNeeded`}>
+                  {renderCategoryCard(category, {
+                    itemFilter: "checked",
+                    sectionType: "notNeeded",
+                    showAddItem: false,
+                    dimmed: true,
+                    sortable: false,
+                  })}
+                </AnimatedCategoryWrapper>
+              ))}
+            </AnimatePresence>
           </div>
         )}
       </section>
