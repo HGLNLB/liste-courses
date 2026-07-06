@@ -1,5 +1,4 @@
 let lockCount = 0;
-let savedScrollY = 0;
 
 export function lockScroll(): void {
   if (typeof document === "undefined") return;
@@ -7,14 +6,8 @@ export function lockScroll(): void {
   lockCount += 1;
   if (lockCount > 1) return;
 
-  savedScrollY = window.scrollY;
+  document.documentElement.style.overflow = "hidden";
   document.body.style.overflow = "hidden";
-  document.body.style.touchAction = "none";
-  document.body.style.position = "fixed";
-  document.body.style.top = `-${savedScrollY}px`;
-  document.body.style.left = "0";
-  document.body.style.right = "0";
-  document.body.style.width = "100%";
 }
 
 export function unlockScroll(): void {
@@ -23,6 +16,15 @@ export function unlockScroll(): void {
   lockCount = Math.max(0, lockCount - 1);
   if (lockCount > 0) return;
 
+  document.documentElement.style.overflow = "";
+  document.body.style.overflow = "";
+}
+
+export function forceUnlockScroll(): void {
+  if (typeof document === "undefined") return;
+
+  lockCount = 0;
+  document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
   document.body.style.touchAction = "";
   document.body.style.position = "";
@@ -30,5 +32,4 @@ export function unlockScroll(): void {
   document.body.style.left = "";
   document.body.style.right = "";
   document.body.style.width = "";
-  window.scrollTo(0, savedScrollY);
 }

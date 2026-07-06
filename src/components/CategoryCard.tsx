@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -25,7 +25,7 @@ import { AnimatedCollapse } from "./AnimatedCollapse";
 import { SwipeableDelete } from "./SwipeableDelete";
 import { useLongPress } from "@/hooks/useLongPress";
 import { formatItemLabel, vibrate } from "@/lib/utils";
-import { lockScroll, unlockScroll } from "@/lib/scrollLock";
+import { forceUnlockScroll, lockScroll, unlockScroll } from "@/lib/scrollLock";
 import { listItemTransition } from "@/lib/motion";
 import type { CategoryWithItems, EditMode } from "@/lib/types";
 
@@ -77,12 +77,18 @@ export function CategoryCard({
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (addingItem || editingItemId) {
+      forceUnlockScroll();
+    }
+  }, [addingItem, editingItemId]);
+
   const categoryEditActive = editMode === "categories";
   const itemsInteractive = editMode === "none" && !categoryEditActive;
   const categorySwipeEnabled = editMode === "none" && !categoryEditActive;
 
   const itemSensors = useSensors(
-    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 3000, tolerance: 24 } }),
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
   );
 

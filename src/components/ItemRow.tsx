@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Checkbox } from "./Checkbox";
-import { useDragListeners } from "@/hooks/useDragListeners";
 import { useSwipeDelete } from "@/hooks/useSwipeDelete";
 import { formatItemLabel } from "@/lib/utils";
 import type { Item } from "@/lib/types";
@@ -42,29 +41,16 @@ export function ItemRow({
   onDelete,
 }: ItemRowProps) {
   const draggedRef = useRef(false);
-  const dragBlockedRef = useRef(false);
 
-  const blockDrag = useCallback(() => {
-    dragBlockedRef.current = true;
-  }, []);
-
-  const unblockDrag = useCallback(() => {
-    dragBlockedRef.current = false;
-  }, []);
-
-  const { x, deleteOpacity, isSwipeActive, revealed, captureHandlers } = useSwipeDelete({
+  const { x, deleteOpacity, isSwipeActive, captureHandlers } = useSwipeDelete({
     enabled: swipeEnabled,
     onDelete,
-    onEngage: blockDrag,
-    onRelease: unblockDrag,
   });
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
-    disabled: !dragEnabled || isSwipeActive || revealed,
+    disabled: !dragEnabled || isSwipeActive,
   });
-
-  const dragListeners = useDragListeners(listeners, dragBlockedRef);
 
   useEffect(() => {
     if (isDragging) {
@@ -103,7 +89,7 @@ export function ItemRow({
 
       <motion.div
         style={{ x: swipeEnabled ? x : 0 }}
-        className={`relative bg-white ${isSwipeActive ? "touch-none" : ""}`}
+        className={`relative bg-white ${isSwipeActive || isDragging ? "touch-none" : ""}`}
       >
         <div
           ref={setNodeRef}
@@ -115,15 +101,11 @@ export function ItemRow({
           {...attributes}
         >
           {dragEnabled ? (
-            <>
-              <div className="shrink-0" data-drag-zone {...dragListeners}>
-                <DragHandle />
-              </div>
+            <div className="flex min-w-0 flex-1 touch-manipulation" data-drag-zone {...listeners}>
+              <DragHandle />
               <div
                 role="button"
                 tabIndex={0}
-                data-drag-zone
-                {...dragListeners}
                 onClick={() => {
                   if (!draggedRef.current && !isDragging) onEdit();
                 }}
@@ -138,7 +120,7 @@ export function ItemRow({
                 <p className="truncate text-base text-[#1C1C1E]">{formatItemLabel(item)}</p>
                 {item.notes && <p className="truncate text-sm text-[#8E8E93]">{item.notes}</p>}
               </div>
-            </>
+            </div>
           ) : (
             <>
               <DragHandle />
@@ -154,7 +136,7 @@ export function ItemRow({
           )}
 
           {showCheckbox && (
-            <div className="shrink-0 pr-4">
+            <div className="shrink-0 pr-4" data-swipe-zone>
               <Checkbox
                 checked={item.is_checked}
                 onChange={onToggleChecked}

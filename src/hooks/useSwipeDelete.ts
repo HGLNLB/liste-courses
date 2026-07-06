@@ -8,6 +8,8 @@ import { vibrate } from "@/lib/utils";
 const REVEAL_OFFSET = 72;
 const DELETE_THRESHOLD = 140;
 const SWIPE_START_PX = 10;
+const DRAG_ZONE_SWIPE_PX = 22;
+const DRAG_HOLD_MS = 3000;
 
 type UseSwipeDeleteOptions = {
   enabled: boolean;
@@ -26,6 +28,8 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
   const scrollLockedRef = useRef(false);
   const gestureRef = useRef<"pending" | "swipe" | "vertical" | null>(null);
   const startRef = useRef({ x: 0, y: 0 });
+  const touchStartTimeRef = useRef(0);
+  const inDragZoneRef = useRef(false);
 
   useEffect(() => {
     revealedRef.current = revealed;
@@ -110,6 +114,21 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
     setIsSwipeActive(true);
   }, [onEngage]);
 
+  const shouldDeferSwipeOnDragZone = useCallback((dx: number, dy: number) => {
+    const elapsed = Date.now() - touchStartTimeRef.current;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+    const horizontalIntent = absDx >= DRAG_ZONE_SWIPE_PX && absDx > absDy * 1.4;
+
+    if (!inDragZoneRef.current) {
+      return absDx < SWIPE_START_PX && absDy < SWIPE_START_PX;
+    }
+
+    if (horizontalIntent) return false;
+    if (elapsed < DRAG_HOLD_MS + 100) return true;
+    return absDy > absDx;
+  }, []);
+
   const updateGesture = useCallback(
     (clientX: number, clientY: number) => {
       if (!enabled || gestureRef.current === "vertical") return false;
@@ -118,9 +137,9 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
       const dy = clientY - startRef.current.y;
 
       if (gestureRef.current === "pending") {
-        if (Math.abs(dx) < SWIPE_START_PX && Math.abs(dy) < SWIPE_START_PX) return false;
+        if (shouldDeferSwipeOnDragZone(dx, dy)) return false;
 
-        if (Math.abs(dy) > Math.abs(dx)) {
+        if (Math.abs(dy) > Math.abs(dx) && !revealedRef.current) {
           gestureRef.current = "vertical";
           return false;
         }
@@ -139,7 +158,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
 
       return false;
     },
-    [enabled, engageSwipe, x],
+    [enabled, engageSwipe, shouldDeferSwipeOnDragZone, x],
   );
 
   const endGesture = useCallback(() => {
@@ -150,6 +169,7 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
     }
 
     gestureRef.current = null;
+    inDragZoneRef.current = false;
     setIsSwipeActive(false);
     onRelease?.();
     releaseScroll();
@@ -160,6 +180,10 @@ export function useSwipeDelete({ enabled, onDelete, onEngage, onRelease }: UseSw
       if (!enabled) return;
       const touch = event.touches[0];
       if (!touch) return;
+
+      const target = event.target as HTMLElement;
+      inDragZoneRef.current = Boolean(target.closest("[data-drag-zone]"));
+      touchStartTimeRef.current = Date.now();
       gestureRef.current = "pending";
       startRef.current = { x: touch.clientX, y: touch.clientY };
     },

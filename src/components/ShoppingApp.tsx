@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { type DragEndEvent } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
 import { useShoppingList } from "@/hooks/useShoppingList";
+import { forceUnlockScroll } from "@/lib/scrollLock";
 import { CategoryEditor } from "./CategoryEditor";
 import { SearchOverlay } from "./SearchOverlay";
 import { ShoppingSections } from "./ShoppingSections";
@@ -52,6 +53,7 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      forceUnlockScroll();
     };
   }, []);
 
