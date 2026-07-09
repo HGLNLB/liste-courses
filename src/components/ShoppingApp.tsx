@@ -7,8 +7,8 @@ import { useShoppingList } from "@/hooks/useShoppingList";
 import { forceUnlockScroll } from "@/lib/scrollLock";
 import { SearchOverlay } from "./SearchOverlay";
 import { ShoppingSections } from "./ShoppingSections";
-import { vibrate } from "@/lib/utils";
-import type { EditMode } from "@/lib/types";
+import { vibrate, ITEM_SORT_STORAGE_KEY } from "@/lib/utils";
+import type { EditMode, ItemSortMode } from "@/lib/types";
 
 type ShoppingAppProps = {
   userId: string;
@@ -41,7 +41,23 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
   const [creatingCategory, setCreatingCategory] = useState(false);
   const [online, setOnline] = useState(true);
+  const [itemSortMode, setItemSortMode] = useState<ItemSortMode>("position");
   const ignoreBackgroundExitUntilRef = useRef(0);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(`${ITEM_SORT_STORAGE_KEY}-${userId}`);
+    if (stored === "alphabetical" || stored === "position") {
+      setItemSortMode(stored);
+    }
+  }, [userId]);
+
+  const toggleItemSortMode = useCallback(() => {
+    setItemSortMode((current) => {
+      const next: ItemSortMode = current === "position" ? "alphabetical" : "position";
+      localStorage.setItem(`${ITEM_SORT_STORAGE_KEY}-${userId}`, next);
+      return next;
+    });
+  }, [userId]);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -123,6 +139,55 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              aria-label={
+                itemSortMode === "alphabetical"
+                  ? "Trier par ordre d'ajout"
+                  : "Trier par ordre alphabétique"
+              }
+              onClick={(event) => {
+                event.stopPropagation();
+                toggleItemSortMode();
+              }}
+              className={`flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-[#E5E5EA] ${
+                itemSortMode === "alphabetical" ? "text-[#007AFF]" : "text-[#1C1C1E]"
+              }`}
+            >
+              {itemSortMode === "alphabetical" ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M6 7H18M6 12H14M6 17H10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M17 15L20 18L17 21"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M4 7H20M4 12H16M4 17H12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M18 8L21 11L18 14"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+            <button
+              type="button"
               aria-label="Rechercher"
               onClick={(event) => {
                 event.stopPropagation();
@@ -137,13 +202,29 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             </button>
             <button
               type="button"
+              aria-label="Se déconnecter"
               onClick={(event) => {
                 event.stopPropagation();
                 handleLogout();
               }}
-              className="rounded-full bg-white px-3 py-2 text-xs font-medium text-[#FF3B30] shadow-sm ring-1 ring-[#E5E5EA]"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#FF3B30] shadow-sm ring-1 ring-[#E5E5EA]"
             >
-              Déconnexion
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M9 21H6C4.9 21 4 20.1 4 19V5C4 3.9 4.9 3 6 3H9"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M16 17L21 12L16 7"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path d="M21 12H9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
             </button>
           </div>
         </div>
@@ -193,6 +274,7 @@ export function ShoppingApp({ userId, userEmail }: ShoppingAppProps) {
             editMode={editMode}
             wiggleCategories={wiggleCategories}
             highlightedItemId={highlightedItemId}
+            itemSortMode={itemSortMode}
             creatingCategory={creatingCategory}
             onCreateCategory={() => setCreatingCategory(true)}
             onCancelCreateCategory={() => setCreatingCategory(false)}

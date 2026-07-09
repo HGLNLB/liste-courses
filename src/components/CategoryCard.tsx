@@ -12,11 +12,11 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import { AnimatePresence, motion } from "framer-motion";
 import { Checkbox } from "./Checkbox";
 import { ColorPicker } from "./ColorPicker";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ItemRow } from "./ItemRow";
+import { SortableItemRow } from "./SortableItemRow";
 import { ItemEditor } from "./ItemEditor";
 import { AnimatedCollapse } from "./AnimatedCollapse";
 import { SwipeableDelete } from "./SwipeableDelete";
@@ -24,9 +24,8 @@ import { useCategoryEditPress } from "@/hooks/useCategoryEditPress";
 import { useDragSensors } from "@/hooks/useDragSensors";
 import { GESTURE } from "@/lib/gestures";
 import { mergeDragListeners, sortableDropAnimation } from "@/lib/dnd";
-import { vibrate, formatItemLabel } from "@/lib/utils";
-import { listItemTransition } from "@/lib/motion";
-import type { CategoryWithItems, EditMode } from "@/lib/types";
+import { vibrate, formatItemLabel, sortItemsByMode } from "@/lib/utils";
+import type { CategoryWithItems, EditMode, ItemSortMode } from "@/lib/types";
 
 type CategoryCardProps = {
   category: CategoryWithItems;
@@ -34,6 +33,7 @@ type CategoryCardProps = {
   wiggleCategories: boolean;
   highlightedItemId: string | null;
   itemFilter?: "all" | "unchecked" | "checked";
+  itemSortMode?: ItemSortMode;
   sectionType?: "toBuy" | "notNeeded";
   showAddItem?: boolean;
   dimmed?: boolean;
@@ -80,6 +80,7 @@ export function CategoryCard({
   wiggleCategories,
   highlightedItemId,
   itemFilter = "all",
+  itemSortMode = "position",
   sectionType,
   showAddItem = true,
   dimmed = false,
@@ -110,10 +111,12 @@ export function CategoryCard({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [swipeDeleteOpacity, setSwipeDeleteOpacity] = useState(1);
   const categorySwipeBlockedRef = useRef(false);
+  const categorySwipeResetRef = useRef<(() => void) | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const categoryEditActive = editMode === "categories";
   const itemsInteractive = editMode === "none" && !categoryEditActive;
+  const itemsDraggable = itemsInteractive && itemSortMode === "position";
   const categorySwipeEnabled = editMode === "none" && !categoryEditActive;
 
   const itemSensors = useDragSensors(GESTURE.ITEM_DRAG_DELAY_MS);
@@ -175,11 +178,13 @@ export function CategoryCard({
       })
     : undefined;
 
-  const visibleItems = category.items.filter((item) => {
+  const filteredItems = category.items.filter((item) => {
     if (itemFilter === "unchecked") return !item.is_checked;
     if (itemFilter === "checked") return item.is_checked;
     return true;
   });
+
+  const visibleItems = sortItemsByMode(filteredItems, itemSortMode);
 
   const reorderableItemIds = visibleItems
     .filter((item) => item.id !== editingItemId)
@@ -264,6 +269,20 @@ export function CategoryCard({
     onDismissEditMode();
   };
 
+  const handleHeaderClick = (event: React.MouseEvent) => {
+    if (categoryEditActive) {
+      handleCategoryEditModeClick(event);
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    if (target.closest("[data-no-toggle]")) return;
+    if (categorySwipeOpen || editingCategoryInline) return;
+
+    onToggleOpen();
+    event.stopPropagation();
+  };
+
   const headerTitle = categoryEditActive ? (
     editingCategoryInline ? (
       <input
@@ -328,13 +347,7 @@ export function CategoryCard({
         isCategoryDragging ? "touch-none cursor-grabbing shadow-md" : categoryHeaderListeners ? "cursor-grab" : ""
       }`}
       data-category-header
-      onClick={(event) => {
-        if (categoryEditActive) {
-          handleCategoryEditModeClick(event);
-          return;
-        }
-        event.stopPropagation();
-      }}
+      onClick={handleHeaderClick}
     >
       {categoryEditActive && (
         <button
@@ -355,29 +368,29 @@ export function CategoryCard({
 
       {categoryEditActive && <CategoryDragHandle />}
 
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        onPointerDown={stopDragPointer}
-        onTouchStart={stopDragPointer}
+      <div
         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-[#8E8E93]"
-        aria-label={category.is_open ? "Replier" : "Déplier"}
+        aria-hidden="true"
       >
         <svg
           width="12"
           height="12"
           viewBox="0 0 12 12"
           className={`transition-transform duration-200 ease-out ${category.is_open ? "rotate-90" : ""}`}
-          aria-hidden="true"
         >
           <path d="M4 2L9 6L4 10" stroke="currentColor" strokeWidth="1.5" fill="none" />
         </svg>
-      </button>
+      </div>
 
       {headerTitle}
 
       {editMode === "none" && !editingCategoryInline && (
-        <div onPointerDown={stopDragPointer} onTouchStart={stopDragPointer} className="shrink-0">
+        <div
+          onPointerDown={stopDragPointer}
+          onTouchStart={stopDragPointer}
+          className="shrink-0"
+          data-no-toggle
+        >
           <Checkbox
             checked={categoryChecked}
             onChange={handleCategoryChecked}
@@ -394,6 +407,10 @@ export function CategoryCard({
         rounded
         roundedBottom={!category.is_open}
         onDelete={onDeleteCategory}
+        onDeleteAttempt={() => setShowDeleteConfirm(true)}
+        onRegisterReset={(reset) => {
+          categorySwipeResetRef.current = reset;
+        }}
         onSwipeOpenChange={handleCategorySwipeOpenChange}
         onOpacityChange={setSwipeDeleteOpacity}
       >
@@ -450,9 +467,13 @@ export function CategoryCard({
         open={showDeleteConfirm}
         title="Supprimer la catégorie ?"
         message={`« ${category.name} » et tous ses éléments seront supprimés définitivement.`}
-        onCancel={() => setShowDeleteConfirm(false)}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          categorySwipeResetRef.current?.();
+        }}
         onConfirm={() => {
           setShowDeleteConfirm(false);
+          categorySwipeResetRef.current?.();
           onDeleteCategory();
         }}
       />
@@ -468,51 +489,44 @@ export function CategoryCard({
             onDragCancel={() => setDraggingItemId(null)}
           >
             <SortableContext items={reorderableItemIds} strategy={verticalListSortingStrategy}>
-              <AnimatePresence initial={false}>
-                {visibleItems.map((item) =>
-                  editingItemId === item.id ? (
-                    <motion.div
-                      key={item.id}
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={listItemTransition}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-3 py-2">
-                        <ItemEditor
-                          initial={item}
-                          onCancel={() => setEditingItemId(null)}
-                          onSave={(payload) => {
-                            onUpdateItem(item.id, payload);
-                            setEditingItemId(null);
-                          }}
-                        />
-                      </div>
-                    </motion.div>
-                  ) : (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      dragEnabled={itemsInteractive}
-                      swipeEnabled={itemsInteractive}
-                      swipeBlocked={itemSwipeOpenId === item.id}
-                      highlighted={highlightedItemId === item.id}
-                      showCheckbox={editMode === "none"}
-                      onSwipeOpenChange={(open) => handleItemSwipeOpenChange(item.id, open)}
-                      onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
-                      onEdit={() => {
-                        if (itemSwipeOpenId === item.id) return;
-                        setEditingItemId(item.id);
-                      }}
-                      onDelete={() => {
-                        setItemSwipeOpenId(null);
-                        onDeleteItem(item.id);
-                      }}
-                    />
-                  ),
-                )}
-              </AnimatePresence>
+              {visibleItems.map((item) =>
+                editingItemId === item.id ? (
+                  <div key={item.id} className="overflow-hidden border-b border-[#F2F2F7] last:border-b-0">
+                    <div className="px-3 py-2">
+                      <ItemEditor
+                        initial={item}
+                        onCancel={() => setEditingItemId(null)}
+                        onSave={(payload) => {
+                          onUpdateItem(item.id, payload);
+                          setEditingItemId(null);
+                        }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <SortableItemRow
+                    key={item.id}
+                    id={item.id}
+                    item={item}
+                    dragEnabled={itemsDraggable}
+                    sortableDisabled={!itemsDraggable}
+                    swipeEnabled={itemsInteractive}
+                    swipeBlocked={itemSwipeOpenId === item.id}
+                    highlighted={highlightedItemId === item.id}
+                    showCheckbox={editMode === "none"}
+                    onSwipeOpenChange={(open) => handleItemSwipeOpenChange(item.id, open)}
+                    onToggleChecked={(checked) => onToggleItemChecked(item.id, checked)}
+                    onEdit={() => {
+                      if (itemSwipeOpenId === item.id) return;
+                      setEditingItemId(item.id);
+                    }}
+                    onDelete={() => {
+                      setItemSwipeOpenId(null);
+                      onDeleteItem(item.id);
+                    }}
+                  />
+                ),
+              )}
             </SortableContext>
             <DragOverlay dropAnimation={sortableDropAnimation}>
               {draggingItem ? (

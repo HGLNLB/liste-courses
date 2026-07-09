@@ -1,4 +1,4 @@
-import type { CategoryWithItems, Item } from "./types";
+import type { CategoryWithItems, Item, ItemSortMode } from "./types";
 
 export function normalizeText(value: string): string {
   return value
@@ -73,3 +73,14 @@ export function isCategoryFullyChecked(category: CategoryWithItems): boolean {
   }
   return category.items.every((item) => item.is_checked);
 }
+
+export function sortItemsByMode(items: Item[], mode: ItemSortMode): Item[] {
+  if (mode === "alphabetical") {
+    return [...items].sort((a, b) =>
+      a.name.localeCompare(b.name, "fr", { sensitivity: "base" }),
+    );
+  }
+  return [...items].sort((a, b) => a.position - b.position);
+}
+
+export const ITEM_SORT_STORAGE_KEY = "shopping-list-item-sort";

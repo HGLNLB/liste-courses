@@ -58,7 +58,10 @@ create policy "items_update_own" on items
 create policy "items_delete_own" on items
   for delete using (auth.uid() = user_id);
 
--- Synchronisation temps réel entre appareils (Supabase Realtime)
+-- ---------------------------------------------------------------------------
+-- Synchronisation temps réel (nouvelle installation OU base déjà existante)
+-- Si les tables existent déjà, exécuter uniquement : supabase/enable-realtime.sql
+-- ---------------------------------------------------------------------------
 alter table categories replica identity full;
 alter table items replica identity full;
 

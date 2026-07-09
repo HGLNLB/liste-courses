@@ -1,8 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useState } from "react";
 import { Checkbox } from "./Checkbox";
 import { SwipeableDelete } from "./SwipeableDelete";
 import { formatItemLabel } from "@/lib/utils";
@@ -15,6 +13,7 @@ type ItemRowProps = {
   swipeBlocked: boolean;
   highlighted: boolean;
   showCheckbox: boolean;
+  isDragging?: boolean;
   onSwipeOpenChange: (open: boolean) => void;
   onToggleChecked: (checked: boolean) => void;
   onEdit: () => void;
@@ -41,24 +40,13 @@ export function ItemRow({
   swipeBlocked,
   highlighted,
   showCheckbox,
+  isDragging = false,
   onSwipeOpenChange,
   onToggleChecked,
   onEdit,
   onDelete,
 }: ItemRowProps) {
   const [swipeOpen, setSwipeOpen] = useState(false);
-
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: item.id,
-    disabled: !dragEnabled || swipeOpen,
-  });
-
-  const sortableStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition: isDragging ? undefined : transition,
-    opacity: isDragging ? 0.45 : item.is_checked ? 0.4 : 1,
-    zIndex: isDragging ? 10 : undefined,
-  };
 
   const handleSwipeOpenChange = (open: boolean) => {
     setSwipeOpen(open);
@@ -67,17 +55,14 @@ export function ItemRow({
 
   const rowContent = (
     <div
-      ref={setNodeRef}
-      style={sortableStyle}
-      {...(dragEnabled ? attributes : {})}
-      {...(dragEnabled ? listeners : {})}
       data-item-id={item.id}
       data-item-row
       className={`relative flex items-center select-none ${
         highlighted ? "bg-[#FFF9C4]" : "bg-white"
-      } ${isDragging ? "touch-none shadow-md ring-1 ring-[#E5E5EA]" : ""}`}
+      } ${isDragging ? "shadow-md ring-1 ring-[#E5E5EA]" : ""}`}
+      style={{ opacity: item.is_checked ? 0.4 : 1 }}
     >
-      <DragHandle />
+      {dragEnabled && <DragHandle />}
       <div
         role="button"
         tabIndex={swipeBlocked ? -1 : 0}
@@ -101,7 +86,7 @@ export function ItemRow({
       </div>
 
       {showCheckbox && (
-        <div className="shrink-0 pr-4" data-no-swipe>
+        <div className="shrink-0 pr-4" data-no-swipe data-no-toggle>
           <Checkbox
             checked={item.is_checked}
             onChange={onToggleChecked}

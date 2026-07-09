@@ -19,13 +19,14 @@ import { GESTURE } from "@/lib/gestures";
 import { sortableDropAnimation } from "@/lib/dnd";
 import { useDragSensors } from "@/hooks/useDragSensors";
 import { getNotNeededCategories, getToBuyCategories, vibrate } from "@/lib/utils";
-import type { CategoryWithItems, EditMode } from "@/lib/types";
+import type { CategoryWithItems, EditMode, ItemSortMode } from "@/lib/types";
 
 type ShoppingSectionsProps = {
   categories: CategoryWithItems[];
   editMode: EditMode;
   wiggleCategories: boolean;
   highlightedItemId: string | null;
+  itemSortMode: ItemSortMode;
   creatingCategory: boolean;
   onCreateCategory: () => void;
   onCancelCreateCategory: () => void;
@@ -55,6 +56,7 @@ export function ShoppingSections({
   editMode,
   wiggleCategories,
   highlightedItemId,
+  itemSortMode,
   creatingCategory,
   onCreateCategory,
   onCancelCreateCategory,
@@ -121,6 +123,7 @@ export function ShoppingSections({
       editMode,
       wiggleCategories,
       highlightedItemId,
+      itemSortMode,
       itemFilter: options.itemFilter,
       sectionType: options.sectionType,
       showAddItem: options.showAddItem,

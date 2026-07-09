@@ -30,6 +30,8 @@ export type CategoryWithItems = Category & {
 
 export type EditMode = "none" | "categories";
 
+export type ItemSortMode = "position" | "alphabetical";
+
 export const CATEGORY_COLORS = [
   { name: "Jaune", value: "#FFD60A" },
   { name: "Vert", value: "#34C759" },

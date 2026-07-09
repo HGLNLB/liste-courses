@@ -28,6 +28,8 @@ function swipeSlideOpacity(x: number) {
 type SwipeableDeleteProps = {
   enabled: boolean;
   onDelete: () => void;
+  onDeleteAttempt?: () => void;
+  onRegisterReset?: (reset: () => void) => void;
   onSwipeOpenChange?: (open: boolean) => void;
   rounded?: boolean;
   roundedBottom?: boolean;
@@ -38,6 +40,8 @@ type SwipeableDeleteProps = {
 export function SwipeableDelete({
   enabled,
   onDelete,
+  onDeleteAttempt,
+  onRegisterReset,
   onSwipeOpenChange,
   rounded = false,
   roundedBottom = false,
@@ -89,6 +93,20 @@ export function SwipeableDelete({
     [x],
   );
 
+  const resetSwipe = useCallback(() => {
+    isDeletingRef.current = false;
+    setRevealed(false);
+    revealedRef.current = false;
+    setIsDragging(false);
+    snapTo(0);
+    notifyOpen(false);
+    onOpacityChange?.(1);
+  }, [notifyOpen, onOpacityChange, snapTo]);
+
+  useEffect(() => {
+    onRegisterReset?.(resetSwipe);
+  }, [onRegisterReset, resetSwipe]);
+
   const handleDelete = useCallback(() => {
     if (isDeletingRef.current) return;
     isDeletingRef.current = true;
@@ -138,6 +156,10 @@ export function SwipeableDelete({
 
       if (revealedAtDragStartRef.current) {
         if (position > DELETE_THRESHOLD || velocityX > 400) {
+          if (onDeleteAttempt) {
+            onDeleteAttempt();
+            return;
+          }
           handleDelete();
           return;
         }
@@ -163,7 +185,7 @@ export function SwipeableDelete({
       snapTo(0);
       notifyOpen(false);
     },
-    [enabled, snapTo, handleDelete, notifyOpen, x],
+    [enabled, snapTo, handleDelete, notifyOpen, onDeleteAttempt, x],
   );
 
   if (!enabled) {
